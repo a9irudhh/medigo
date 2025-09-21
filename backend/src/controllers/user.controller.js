@@ -320,38 +320,6 @@ const verifyEmail = asyncHandler(async (req, res) => {
     );
 });
 
-/**
- * Verify phone
- * @route POST /api/users/verify-phone
- * @access Private
- */
-const verifyPhone = asyncHandler(async (req, res) => {
-    const { token } = req.body;
-
-    if (!token) {
-        throw new ApiError(400, "Verification token is required");
-    }
-
-    const user = await User.findOne({
-        _id: req.user.id,
-        phoneVerificationToken: token,
-        phoneVerificationExpires: { $gt: Date.now() }
-    });
-
-    if (!user) {
-        throw new ApiError(400, "Invalid or expired verification token");
-    }
-
-    // Update user verification status
-    user.isPhoneVerified = true;
-    user.phoneVerificationToken = undefined;
-    user.phoneVerificationExpires = undefined;
-    await user.save();
-
-    return res.status(200).json(
-        new ApiResponse(200, null, "Phone verified successfully")
-    );
-});
 
 export {
     signup,
@@ -359,6 +327,5 @@ export {
     logout,
     getProfile,
     updateProfile,
-    verifyEmail,
-    verifyPhone
+    verifyEmail
 };

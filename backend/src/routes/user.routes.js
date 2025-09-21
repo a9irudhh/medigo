@@ -21,6 +21,5 @@ router.route('/logout').post(authenticate, logout);
 router.route('/profile').get(authenticate, getProfile);
 router.route('/update-profile').put(authenticate, updateProfile);
 router.route('/verify-email').post(authenticate, verifyEmail);
-router.route('/verify-phone').post(authenticate, verifyPhone);
 
 export default router;
