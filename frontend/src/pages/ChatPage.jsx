@@ -14,6 +14,7 @@ import SendIcon from '@mui/icons-material/Send';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import PersonIcon from '@mui/icons-material/Person';
+import { Link } from 'react-router-dom';
 
 const BOT_AVATAR = <Avatar sx={{ bgcolor: '#10a37f' }}><MedicalServicesIcon /></Avatar>;
 const USER_AVATAR = <Avatar sx={{ bgcolor: '#1976d2' }}><PersonIcon /></Avatar>;
@@ -63,7 +64,12 @@ const ChatPage = () => {
       <AppBar position="static" sx={{ bgcolor: '#10a37f' }} elevation={0}>
         <Toolbar>
           <LocalHospitalIcon sx={{ mr: 1 }} />
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 700, cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}
+            component={Link}
+            to="/profile"
+          >
             Medigo
           </Typography>
         </Toolbar>
