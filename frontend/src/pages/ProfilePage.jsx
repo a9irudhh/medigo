@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import { getProfile, logout as logoutUser } from '../services/api';
 import Spinner from '../components/Spinner';
+import Header from '../components/Header';
 
 const ProfilePage = () => {
   const { user, setUser, logout } = useAuthStore();
@@ -33,6 +34,8 @@ const ProfilePage = () => {
   }
 
   return (
+    <>
+    <Header/>
     <div className="container mx-auto p-4 md:p-8">
       <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-gray-800 border-b pb-4">My Profile</h1>
@@ -51,11 +54,12 @@ const ProfilePage = () => {
           </div>
         </div>
         <div className="mt-8 flex space-x-4">
-          <Link to="/update-profile" className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">Update Profile</Link>
+          <Link to="/update-profile" className="px-6 py-2 border-1 border-blue-500 text-blue-500 bg-primary hover:text-white rounded-lg hover:bg-blue-600">Update Profile</Link>
           <button onClick={handleLogout} className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Logout</button>
         </div>
       </div>
     </div>
+    </>
   );
 };
 

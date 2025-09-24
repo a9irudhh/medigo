@@ -18,7 +18,7 @@ const LoginPage = () => {
     try {
       const { data } = await login({ identifier, password });
       authLogin(data.data.user, data.data.token);
-      navigate('/profile');
+      navigate('/chat');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {

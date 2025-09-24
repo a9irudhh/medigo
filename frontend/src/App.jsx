@@ -5,8 +5,9 @@ import SignupPage from './pages/SignupPage';
 import ProfilePage from './pages/ProfilePage';
 import UpdateProfilePage from './pages/UpdateProfilePage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
-import VerifyPhonePage from './pages/VerifyPhonePage';
+// import VerifyPhonePage from './pages/VerifyPhonePage';
 import useAuthStore from './store/authStore';
+import ChatPage from './pages/ChatPage';
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated } = useAuthStore();
@@ -28,7 +29,8 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/update-profile" element={<UpdateProfilePage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/verify-phone" element={<VerifyPhonePage />} />
+          {/* <Route path="/verify-phone" element={<VerifyPhonePage />} /> */}
+          <Route path="/chat" element={<ChatPage />} />
         </Routes>
       </div>
     </Router>
