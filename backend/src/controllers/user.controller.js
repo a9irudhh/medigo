@@ -2,7 +2,13 @@ import User from '../models/user.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { generateVerificationToken } from '../utils/userUtils.js';
+import { generateVerificationToken, generatePasswordResetToken, generateOTP } from '../utils/userUtils.js';
+import { 
+    sendPasswordResetEmail, 
+    sendPasswordChangeConfirmationEmail,
+    sendVerificationEmail,
+    sendWelcomeEmail 
+} from '../services/emailService.js';
 
 /**
  * Register a new user
@@ -68,25 +74,28 @@ const signup = asyncHandler(async (req, res) => {
             appointmentReminders: preferences?.appointmentReminders ?? true,
             dataSharing: preferences?.dataSharing ?? false
         },
-        // Generate verification tokens
-        emailVerificationToken: generateVerificationToken(),
-        phoneVerificationToken: generateVerificationToken(),
-        emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-        phoneVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+        // Generate email verification OTP
+        emailOTP: generateOTP(),
+        emailOTPExpiry: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
     };
 
     // Create user
     const user = await User.create(userData);
 
     // Remove sensitive information from response
-    const userResponse = await User.findById(user._id).select('-password -emailVerificationToken -phoneVerificationToken');
+    const userResponse = await User.findById(user._id).select('-password -emailVerificationToken -phoneVerificationToken -emailOTP -forgotPasswordOTP');
 
     // Generate JWT token
     const token = user.generateAuthToken();
 
-    // TODO: Send verification emails/SMS in production
-    // await sendVerificationEmail(user.email, user.emailVerificationToken);
-    // await sendVerificationSMS(user.phone, user.phoneVerificationToken);
+    // Send verification email with OTP
+    try {
+        await sendVerificationEmail(user.email, user.firstName, user.emailOTP);
+        console.log('Verification email sent successfully');
+    } catch (error) {
+        console.error('Failed to send verification email:', error);
+        // Don't fail registration if email sending fails
+    }
 
     return res.status(201).json(
         new ApiResponse(
@@ -94,7 +103,7 @@ const signup = asyncHandler(async (req, res) => {
             {
                 user: userResponse,
                 token,
-                message: "Account created successfully. Please verify your email and phone number."
+                message: "Account created successfully. Please check your email for verification OTP."
             },
             "User registered successfully"
         )
@@ -234,9 +243,6 @@ const updateProfile = asyncHandler(async (req, res) => {
             throw new ApiError(409, "Phone number is already registered");
         }
         user.phone = phone;
-        user.isPhoneVerified = false; // Reset verification if phone changed
-        user.phoneVerificationToken = generateVerificationToken();
-        user.phoneVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     }
 
     // Update fields if provided
@@ -288,69 +294,228 @@ const updateProfile = asyncHandler(async (req, res) => {
 });
 
 /**
- * Verify email
+ * Verify email with OTP
  * @route POST /api/users/verify-email
  * @access Private
  */
 const verifyEmail = asyncHandler(async (req, res) => {
-    const { token } = req.body;
+    const { otp } = req.body;
 
-    if (!token) {
-        throw new ApiError(400, "Verification token is required");
+    if (!otp) {
+        throw new ApiError(400, "Email OTP is required");
     }
 
     const user = await User.findOne({
         _id: req.user.id,
-        emailVerificationToken: token,
-        emailVerificationExpires: { $gt: Date.now() }
+        emailOTP: otp.toString(),
+        emailOTPExpiry: { $gt: Date.now() }
     });
 
     if (!user) {
-        throw new ApiError(400, "Invalid or expired verification token");
+        throw new ApiError(400, "Invalid or expired email OTP");
     }
 
     // Update user verification status
     user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
+    user.emailOTP = undefined;
+    user.emailOTPExpiry = undefined;
     await user.save();
 
+    // Send welcome email
+    try {
+        await sendWelcomeEmail(user.email, user.firstName);
+    } catch (error) {
+        console.error('Failed to send welcome email:', error);
+    }
+
     return res.status(200).json(
-        new ApiResponse(200, null, "Email verified successfully")
+        new ApiResponse(200, null, "Email verified successfully! Welcome to MediGo.")
     );
 });
 
 /**
- * Verify phone
- * @route POST /api/users/verify-phone
- * @access Private
+ * Forgot password - Send reset OTP
+ * @route POST /api/users/forgot-password
+ * @access Public
  */
-const verifyPhone = asyncHandler(async (req, res) => {
-    const { token } = req.body;
+const forgotPassword = asyncHandler(async (req, res) => {
+    const { email } = req.body;
 
-    if (!token) {
-        throw new ApiError(400, "Verification token is required");
+    if (!email) {
+        throw new ApiError(400, "Email is required");
     }
 
-    const user = await User.findOne({
-        _id: req.user.id,
-        phoneVerificationToken: token,
-        phoneVerificationExpires: { $gt: Date.now() }
+    // Find user by email
+    const user = await User.findOne({ 
+        email: email.toLowerCase().trim(),
+        isActive: true 
     });
 
     if (!user) {
-        throw new ApiError(400, "Invalid or expired verification token");
+        // Don't reveal if email exists or not for security
+        return res.status(200).json(
+            new ApiResponse(200, null, "If the email exists, a password reset OTP has been sent")
+        );
     }
 
-    // Update user verification status
-    user.isPhoneVerified = true;
-    user.phoneVerificationToken = undefined;
-    user.phoneVerificationExpires = undefined;
+    // Generate password reset OTP
+    const resetOTP = generateOTP();
+    const resetOTPExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Save reset OTP to user
+    user.resetPasswordOTP = resetOTP;
+    user.resetPasswordOTPExpiry = resetOTPExpires;
     await user.save();
 
+    try {
+        // Send password reset email with OTP
+        await sendPasswordResetEmail(user.email, user.firstName, resetOTP);
+
+        return res.status(200).json(
+            new ApiResponse(200, null, "Password reset OTP sent to your email successfully")
+        );
+    } catch (error) {
+        // Clear reset OTP if email sending fails
+        user.resetPasswordOTP = undefined;
+        user.resetPasswordOTPExpiry = undefined;
+        await user.save();
+
+        console.error("Failed to send password reset email:", error);
+        throw new ApiError(500, "Failed to send password reset email. Please try again.");
+    }
+});
+
+/**
+ * Reset password using OTP
+ * @route POST /api/users/reset-password
+ * @access Public
+ */
+const resetPassword = asyncHandler(async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+        throw new ApiError(400, "Email, OTP and new password are required");
+    }
+
+    if (newPassword.length < 8) {
+        throw new ApiError(400, "Password must be at least 8 characters long");
+    }
+
+    // Find user with valid reset OTP
+    const user = await User.findOne({
+        email: email.toLowerCase().trim(),
+        resetPasswordOTP: otp.toString(),
+        resetPasswordOTPExpiry: { $gt: Date.now() },
+        isActive: true
+    });
+
+    if (!user) {
+        throw new ApiError(400, "Invalid or expired password reset OTP");
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordOTPExpiry = undefined;
+    await user.save();
+
+    // Send confirmation email
+    try {
+        await sendPasswordChangeConfirmationEmail(user.email, user.firstName);
+    } catch (error) {
+        console.error("Failed to send password change confirmation email:", error);
+        // Don't throw error here as password was successfully changed
+    }
+
     return res.status(200).json(
-        new ApiResponse(200, null, "Phone verified successfully")
+        new ApiResponse(200, null, "Password reset successfully")
     );
+});
+
+/**
+ * Change password (for logged-in users)
+ * @route POST /api/users/change-password
+ * @access Private
+ */
+const changePassword = asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+        throw new ApiError(400, "Current password and new password are required");
+    }
+
+    if (newPassword.length < 8) {
+        throw new ApiError(400, "New password must be at least 8 characters long");
+    }
+
+    // Find user with password
+    const user = await User.findById(req.user.id).select('+password');
+    
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    if (!isCurrentPasswordValid) {
+        throw new ApiError(400, "Current password is incorrect");
+    }
+
+    // Check if new password is same as current
+    const isSamePassword = await user.comparePassword(newPassword);
+    if (isSamePassword) {
+        throw new ApiError(400, "New password must be different from current password");
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    // Send confirmation email
+    try {
+        await sendPasswordChangeConfirmationEmail(user.email, user.firstName);
+    } catch (error) {
+        console.error("Failed to send password change confirmation email:", error);
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, null, "Password changed successfully")
+    );
+});
+
+/**
+ * Resend email verification OTP
+ * @route POST /api/users/resend-email-otp
+ * @access Private
+ */
+const resendEmailOTP = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    if (user.isEmailVerified) {
+        throw new ApiError(400, "Email is already verified");
+    }
+
+    // Generate new OTP
+    const newOTP = generateOTP();
+    user.emailOTP = newOTP;
+    user.emailOTPExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await user.save();
+
+    // Send new OTP
+    try {
+        await sendVerificationEmail(user.email, user.firstName, newOTP);
+        
+        return res.status(200).json(
+            new ApiResponse(200, null, "New verification OTP sent to your email")
+        );
+    } catch (error) {
+        console.error("Failed to resend verification email:", error);
+        throw new ApiError(500, "Failed to send verification email. Please try again.");
+    }
 });
 
 export {
@@ -360,5 +525,8 @@ export {
     getProfile,
     updateProfile,
     verifyEmail,
-    verifyPhone
+    forgotPassword,
+    resetPassword,
+    changePassword,
+    resendEmailOTP
 };
