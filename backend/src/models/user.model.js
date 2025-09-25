@@ -145,18 +145,35 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    isPhoneVerified: {
-        type: Boolean,
-        default: false
-    },
     emailVerificationToken: String,
     emailVerificationExpires: Date,
     phoneVerificationToken: String,
     phoneVerificationExpires: Date,
     passwordResetToken: String,
     passwordResetExpires: Date,
+    // Email verification
+    emailOTP: {
+        type: String,
+        default: null
+    },
+    emailOTPExpiry: {
+        type: Date,
+        default: null
+    },
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
 
-    // AI Interaction History (for MediGo AI agent)
+    // Password reset
+    resetPasswordOTP: {
+        type: String,
+        default: null
+    },
+    resetPasswordOTPExpiry: {
+        type: Date,
+        default: null
+    },
     conversationHistory: [{
         sessionId: {
             type: String,
