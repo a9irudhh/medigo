@@ -3,6 +3,7 @@ import BotIcon from '../icons/BotIcon';
 import UserIcon from '../icons/UserIcon';
 import SendIcon from '../icons/SendIcon';
 import Header from '../components/Header';
+import { sendUserChat } from '../services/api';
 
 const ChatPage = () => {
   // --- State Management ---
@@ -34,6 +35,7 @@ const ChatPage = () => {
   const handleSend = () => {
     if (!input.trim() || loading) return;
 
+    // sendUserChat
     const userMsg = { sender: 'user', text: input };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
