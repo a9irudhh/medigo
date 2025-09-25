@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Cardiology",
+    "description": "Medical specialty dealing with disorders of the heart and blood vessels",
+    "common_symptoms": ["chest pain", "shortness of breath", "heart palpitations", "dizziness", "fatigue", "swelling in legs"],
+    "keywords": ["heart", "cardiac", "chest pain", "palpitations", "blood pressure", "cholesterol"]
+  },
+  {
+    "name": "Dermatology", 
+    "description": "Medical specialty dealing with skin, hair, and nail disorders",
+    "common_symptoms": ["skin rash", "acne", "eczema", "hair loss", "nail problems", "moles", "itching"],
+    "keywords": ["skin", "rash", "acne", "eczema", "dermatitis", "hair", "nail", "mole"]
+  },
+  {
+    "name": "Pediatrics",
+    "description": "Medical specialty focused on the health and medical care of infants, children, and adolescents",
+    "common_symptoms": ["fever in children", "cough", "stomach ache", "growth concerns", "developmental delays", "immunization"],
+    "keywords": ["child", "children", "infant", "baby", "pediatric", "vaccination", "growth"]
+  },
+  {
+    "name": "Orthopedics",
+    "description": "Medical specialty dealing with musculoskeletal system including bones, joints, muscles, and ligaments",
+    "common_symptoms": ["joint pain", "back pain", "bone fracture", "muscle strain", "arthritis", "sports injury"],
+    "keywords": ["bone", "joint", "back pain", "arthritis", "fracture", "sports injury", "muscle"]
+  },
+  {
+    "name": "Neurology",
+    "description": "Medical specialty dealing with disorders of the nervous system including brain and spinal cord",
+    "common_symptoms": ["headache", "seizures", "memory problems", "numbness", "weakness", "dizziness", "tremors"],
+    "keywords": ["brain", "neurological", "headache", "seizure", "memory", "numbness", "tremor"]
+  },
+  {
+    "name": "Gastroenterology",
+    "description": "Medical specialty dealing with digestive system and its disorders",
+    "common_symptoms": ["stomach pain", "nausea", "vomiting", "diarrhea", "constipation", "bloating", "acid reflux"],
+    "keywords": ["stomach", "digestive", "nausea", "vomiting", "diarrhea", "constipation", "reflux"]
+  },
+  {
+    "name": "Gynecology",
+    "description": "Medical specialty dealing with women's reproductive health",
+    "common_symptoms": ["menstrual problems", "pelvic pain", "pregnancy concerns", "menopause symptoms", "contraception"],
+    "keywords": ["women", "gynecological", "menstrual", "pregnancy", "pelvic", "menopause", "reproductive"]
+  },
+  {
+    "name": "Psychiatry",
+    "description": "Medical specialty dealing with mental health disorders",
+    "common_symptoms": ["depression", "anxiety", "mood swings", "sleep problems", "stress", "panic attacks"],
+    "keywords": ["mental health", "depression", "anxiety", "stress", "mood", "psychiatric", "therapy"]
+  },
+  {
+    "name": "Endocrinology",
+    "description": "Medical specialty dealing with hormones and endocrine system disorders",
+    "common_symptoms": ["diabetes", "thyroid problems", "weight changes", "fatigue", "hormonal imbalance"],
+    "keywords": ["diabetes", "thyroid", "hormone", "endocrine", "insulin", "metabolism", "weight"]
+  },
+  {
+    "name": "Ophthalmology",
+    "description": "Medical specialty dealing with eye and vision disorders",
+    "common_symptoms": ["vision problems", "eye pain", "blurred vision", "dry eyes", "eye infection", "cataracts"],
+    "keywords": ["eye", "vision", "sight", "blurred", "cataract", "glaucoma", "ophthalmology"]
+  }
+]
