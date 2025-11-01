@@ -1,7 +1,6 @@
-import React from 'react';
 import UserIcon from '../icons/UserIcon';
 import BotIcon from '../icons/BotIcon';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 // --- Icon Components (included for a self-contained example) ---
 
 
@@ -31,12 +30,14 @@ const Header = () => {
                 </div>
 
                 {/* 2. Centered Title: Will not shrink and stays in the middle. */}
+                <Link to="/home" >
                 <div className="flex-shrink-0">
                     <h1 className="text-xl font-bold text-gray-800 flex items-center">
                         <BotIcon className="w-6 h-6 mr-2 text-teal-600" />
                         Medigo Assistant
                     </h1>
                 </div>
+                </Link>
 
                 {/* 3. Right Icon Container: Takes up 1/3 of the space and pushes its content to the end. */}
                 <div className="flex-1 flex justify-end">

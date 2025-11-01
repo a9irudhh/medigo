@@ -1,6 +1,4 @@
-import React, { useState } from 'react';
-// import Input from '../components/Input';
-// import Button from '../components/Button';
+import { useState } from 'react';
 import Spinner from '../components/Spinner';
 import { verifyEmail } from '../services/api';
 import Header from '../components/Header';
@@ -29,7 +27,7 @@ const VerifyEmailPage = () => {
   return (
     <>
     <Header />
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex items-center justify-center min-h-[70vh] bg-gradient-to-b from-teal-50 to-white">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-xl">
         <h2 className="text-2xl font-bold text-center">Verify Your Email</h2>
         <p className="text-center text-gray-600">Enter the 6-digit code sent to your email address.</p>
