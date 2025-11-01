@@ -14,8 +14,12 @@ from agents.booking_coordinator import BookingCoordinatorAgent
 
 class EnhancedMedicalConsultationWorkflow:
     """
-    Enhanced medical consultation workflow with deep context awareness,
-    rich prompts, and elimination of hallucinations through data-driven decisions.
+    Streamlined medical consultation workflow:
+    1. Understand symptoms quickly (no excessive clarification)
+    2. Match with available doctors from database
+    3. Let user select doctor (if multiple options)
+    4. Book appointment immediately
+    5. Send confirmation email
     """
     
     def __init__(self, database_manager, gemini_client):
@@ -34,7 +38,7 @@ class EnhancedMedicalConsultationWorkflow:
         # Conversation state tracking with enhanced metadata
         self.active_conversations = {}
         
-        logger.info("Enhanced Medical consultation workflow initialized with deep context management")
+        logger.info("Streamlined Medical consultation workflow initialized")
     
     async def process_message(
         self,
@@ -44,589 +48,695 @@ class EnhancedMedicalConsultationWorkflow:
         conversation_state: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Process a user message with comprehensive context awareness and rich prompts.
-        Eliminates hallucinations by using real database data and detailed context.
+        Simplified process: Greeting → Symptoms → Show 1 Doctor → Yes/No → Book → Done
         """
         
         try:
-            # Build comprehensive conversation context
-            full_context = await self.context_manager.build_conversation_context(
-                conversation_id, user_id, message, conversation_state
-            )
-            
-            current_status = conversation_state.get("status", "started")
             current_step = conversation_state.get("currentStep", "initial_greeting")
             
-            logger.info(f"Processing message with enhanced context - Conversation: {conversation_id}, "
-                       f"Step: {current_step}, Progress: {full_context['step_history']['progress_percentage']}%")
+            logger.info(f"Processing message - Conversation: {conversation_id}, Step: {current_step}, Message: {message[:50]}")
             
-            # Route to enhanced handlers based on current step
-            if current_step in ["initial_greeting", "symptom_collection", "symptom_clarification"]:
-                return await self._enhanced_symptom_analysis(full_context)
+            # Route based on current step
+            if current_step == "initial_greeting":
+                return self._handle_initial_greeting(message, conversation_state)
             
-            elif current_step in ["doctor_recommendation", "doctor_confirmation"]:
-                return await self._enhanced_doctor_matching(full_context)
+            elif current_step == "symptom_collection":
+                return await self._handle_symptom_collection(message, conversation_state, user_id, conversation_id)
+
+            elif current_step == "doctor_confirmation":
+                return await self._handle_doctor_confirmation(message, conversation_state, user_id, conversation_id)
             
-            elif current_step in ["slot_selection", "appointment_confirmation"]:
-                return await self._enhanced_appointment_booking(full_context)
+            elif current_step == "completed":
+                return self._handle_completed(message)
             
             else:
-                # Enhanced fallback with context
-                return await self._enhanced_general_inquiry(full_context)
+                return self._handle_general_inquiry(message)
         
         except Exception as e:
             logger.error(f"Error processing message in workflow: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return {
-                "message": "I apologize, but I'm experiencing some technical difficulties. Could you please try again?",
+                "message": "I apologize for the technical difficulty. Could you please describe your symptoms again?",
                 "agentType": "system",
-                "confidence": 0.0,
-                "requiresInput": True,
-                "newStatus": "error"
-            }
-    
-    async def _enhanced_symptom_analysis(self, full_context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Enhanced symptom analysis with comprehensive context and rich prompts.
-        Eliminates hallucinations by using real database data for specialization matching.
-        """
-        
-        try:
-            # Build rich, context-aware prompt
-            analysis_prompt = self.prompt_builder.build_symptom_analysis_prompt(full_context)
-            
-            # Get AI analysis with comprehensive context
-            ai_response = await self.gemini_client.generate_response(analysis_prompt)
-            
-            # Parse AI response (expecting JSON)
-            try:
-                analysis_result = json.loads(ai_response)
-            except json.JSONDecodeError:
-                # Fallback parsing if JSON is malformed
-                analysis_result = self._parse_analysis_fallback(ai_response, full_context)
-            
-            # Validate analysis against database context
-            validated_analysis = self._validate_analysis_against_database(
-                analysis_result, full_context["database_context"]
-            )
-            
-            # Determine next step based on analysis completeness
-            next_step, next_status = self._determine_symptom_analysis_next_step(
-                validated_analysis, full_context
-            )
-            
-            # Prepare comprehensive response
-            response = {
-                "message": self._format_symptom_analysis_response(validated_analysis, full_context),
-                "agentType": "symptom_analyzer",
-                "confidence": validated_analysis.get("confidence", 0.8),
-                "suggestions": validated_analysis.get("follow_up_questions", []),
-                "requiresInput": next_step != "doctor_recommendation",
-                "newStatus": next_status,
-                "newStep": next_step
-            }
-            
-            # Add extracted data with rich context
-            response["extractedData"] = {
-                "symptoms": {
-                    "extracted": validated_analysis.get("extracted_symptoms", []),
-                    "severity": validated_analysis.get("severity", "moderate"),
-                    "analysis": validated_analysis.get("analysis", ""),
-                    "confidence": validated_analysis.get("confidence", 0.8)
-                },
-                "recommended_specializations": validated_analysis.get("recommended_specializations", []),
-                "analysis_reasoning": validated_analysis.get("reasoning", ""),
-                "context_used": {
-                    "conversation_length": full_context["medical_context"]["message_count"],
-                    "previous_symptoms": list(full_context["medical_context"]["detected_symptoms"].keys()),
-                    "available_specializations": len(full_context["database_context"]["specializations"])
-                }
-            }
-            
-            return response
-            
-        except Exception as e:
-            logger.error(f"Error in enhanced symptom analysis: {e}")
-            return self._create_error_response("symptom_analyzer", "I'm having trouble analyzing your symptoms. Could you please describe them again?")
-    
-    async def _enhanced_doctor_matching(self, full_context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Enhanced doctor matching with comprehensive context and real database integration.
-        Eliminates hallucinations by using actual doctor data from MongoDB.
-        """
-        
-        try:
-            conversation_state = full_context["conversation_state"]
-            current_step = conversation_state.get("currentStep", "doctor_recommendation")
-            
-            if current_step == "doctor_recommendation":
-                # Get symptom analysis from extracted data
-                extracted_data = conversation_state.get("extractedData", {})
-                symptoms_data = extracted_data.get("symptoms", {})
-                
-                if not symptoms_data.get("extracted"):
-                    return self._create_error_response(
-                        "doctor_matcher", 
-                        "I need to understand your symptoms better before recommending doctors. Could you describe what's bothering you?"
-                    )
-                
-                # Build rich prompt for doctor matching
-                doctor_matching_prompt = self.prompt_builder.build_doctor_matching_prompt(
-                    full_context, symptoms_data
-                )
-                
-                # Get AI recommendation with real database context
-                ai_response = await self.gemini_client.generate_response(doctor_matching_prompt)
-                
-                # Parse and validate AI response
-                try:
-                    matching_result = json.loads(ai_response)
-                except json.JSONDecodeError:
-                    matching_result = self._parse_doctor_matching_fallback(ai_response, full_context)
-                
-                # Validate recommended doctors exist in database
-                validated_doctors = await self._validate_recommended_doctors(
-                    matching_result.get("matched_doctors", []), full_context["database_context"]
-                )
-                
-                if not validated_doctors:
-                    return self._create_fallback_doctor_response(full_context)
-                
-                # Format comprehensive response
-                response = {
-                    "message": self._format_doctor_recommendation_message(validated_doctors, full_context),
-                    "agentType": "doctor_matcher", 
-                    "confidence": matching_result.get("confidence", 0.8),
-                    "options": self._format_doctor_options(validated_doctors),
-                    "requiresInput": True,
-                    "newStatus": "confirming_doctor",
-                    "newStep": "doctor_confirmation"
-                }
-                
-                # Add extracted data with matched doctors
-                response["extractedData"] = {
-                    "matched_doctors": validated_doctors,
-                    "specialization_used": matching_result.get("specialization_used", "General Medicine"),
-                    "matching_confidence": matching_result.get("confidence", 0.8),
-                    "context_used": {
-                        "total_doctors_considered": len(full_context["database_context"]["doctors"]),
-                        "specializations_available": len(full_context["database_context"]["specializations"])
-                    }
-                }
-                
-                return response
-                
-            elif current_step == "doctor_confirmation":
-                # Handle doctor selection with context awareness
-                return await self._handle_doctor_selection_with_context(full_context)
-                
-        except Exception as e:
-            logger.error(f"Error in enhanced doctor matching: {e}")
-            return self._create_error_response("doctor_matcher", "I'm having trouble finding suitable doctors. Let me try again.")
-    
-    async def _enhanced_appointment_booking(self, full_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Enhanced appointment booking with comprehensive context"""
-        
-        try:
-            conversation_state = full_context["conversation_state"]
-            extracted_data = conversation_state.get("extractedData", {})
-            selected_doctor = extracted_data.get("selected_doctor")
-            
-            if not selected_doctor:
-                return self._create_error_response("booking_coordinator", "I need to know which doctor you'd like to see first.")
-            
-            # Build appointment booking prompt with full context
-            booking_prompt = self.prompt_builder.build_appointment_booking_prompt(full_context, selected_doctor)
-            
-            # Get AI response for appointment scheduling
-            ai_response = await self.gemini_client.generate_response(booking_prompt)
-            
-            # Parse booking response
-            try:
-                booking_result = json.loads(ai_response)
-            except json.JSONDecodeError:
-                booking_result = self._create_fallback_booking_response(selected_doctor)
-            
-            return {
-                "message": booking_result.get("booking_message", "Let me help you schedule an appointment."),
-                "agentType": "booking_coordinator",
-                "confidence": 0.8,
-                "options": booking_result.get("available_slots", []),
-                "requiresInput": booking_result.get("requires_confirmation", True),
-                "newStatus": "selecting_slot",
-                "newStep": "appointment_confirmation"
-            }
-            
-        except Exception as e:
-            logger.error(f"Error in enhanced appointment booking: {e}")
-            return self._create_error_response("booking_coordinator", "I'm having trouble with appointment scheduling. Let me try again.")
-    
-    async def _enhanced_general_inquiry(self, full_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Enhanced general inquiry handler with context awareness"""
-        
-        medical_context = full_context["medical_context"]
-        
-        # If medical symptoms detected, route to symptom analysis
-        if medical_context["detected_symptoms"]:
-            return {
-                "message": "I noticed you mentioned some symptoms. Let me help you find the right medical care.",
-                "agentType": "symptom_analyzer",
-                "confidence": 0.7,
+                "confidence": 0.5,
                 "requiresInput": True,
                 "newStatus": "gathering_symptoms",
                 "newStep": "symptom_collection"
             }
-        
-        # Default helpful response
+    
+    def _handle_initial_greeting(self, message: str, conversation_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle initial greeting and move to symptom collection"""
         return {
-            "message": "I'm here to help you with medical consultations. Could you please describe any symptoms or health concerns you have?",
-            "agentType": "system",
-            "confidence": 0.6,
+            "message": "Hello! I'm here to help you find the right doctor and book an appointment. Please describe your symptoms or health concern.",
+            "agentType": "symptom_analyzer",
+            "confidence": 1.0,
             "requiresInput": True,
-            "suggestions": [
-                "Describe your symptoms",
-                "Tell me what's bothering you",
-                "How can I help with your health?"
-            ]
+            "newStatus": "gathering_symptoms",
+            "newStep": "symptom_collection"
         }
     
-    async def _handle_doctor_matching(
+    async def _handle_symptom_collection(
+        self, 
+        message: str, 
+        conversation_state: Dict[str, Any],
+        user_id: str,
+        conversation_id: str
+    ) -> Dict[str, Any]:
+        """
+        Analyze symptoms and show THE BEST MATCHING DOCTOR (top 1 only).
+        """
+        
+        try:
+            # Analyze symptoms with AI
+            analysis_prompt = self._build_streamlined_symptom_prompt({"current_message": message})
+            ai_response = await self.gemini_client.generate_response(analysis_prompt)
+            
+            logger.info(f"AI Symptom Analysis: {ai_response[:200]}")
+            
+            # Parse AI response
+            try:
+                cleaned_response = ai_response.strip()
+                if cleaned_response.startswith("```json"):
+                    cleaned_response = cleaned_response[7:]
+                if cleaned_response.startswith("```"):
+                    cleaned_response = cleaned_response[3:]
+                if cleaned_response.endswith("```"):
+                    cleaned_response = cleaned_response[:-3]
+                cleaned_response = cleaned_response.strip()
+                
+                analysis_result = json.loads(cleaned_response)
+            except json.JSONDecodeError:
+                logger.warning("JSON parse error, using fallback extraction")
+                analysis_result = self._extract_specialization_from_message(message)
+            
+            specialization = analysis_result.get("specialization", "General Medicine")
+            symptoms_text = ", ".join(analysis_result.get("symptoms", [message]))
+            
+            # Check for urgent cases
+            if analysis_result.get("severity") == "urgent":
+                return {
+                    "message": f"Based on your symptoms, I recommend seeking immediate medical attention. Please visit the nearest emergency room or call emergency services.",
+                    "agentType": "symptom_analyzer",
+                    "confidence": 1.0,
+                    "requiresInput": False,
+                    "newStatus": "completed",
+                    "newStep": "completed"
+                }
+            
+            # Find doctors for the specialization (get top 1 only)
+            all_doctors = await self._find_doctors_by_specialization(specialization)
+            
+            if not all_doctors:
+                return {
+                    "message": f"I couldn't find available doctors for {specialization}. Would you like me to check for General Medicine doctors instead?",
+                    "agentType": "doctor_matcher",
+                    "confidence": 0.7,
+                    "requiresInput": True,
+                    "newStep": "symptom_collection"
+                }
+            
+            # Get TOP 1 doctor only
+            top_doctor = all_doctors[0]
+            
+            # Format message with single doctor
+            doctor_message = (
+                f"Based on your concern ({symptoms_text}), I recommend seeing a {specialization} specialist.\n\n"
+                f"I found the best match for you:\n\n"
+                f"Dr. {top_doctor['name']}\n"
+                f"- Specialization: {top_doctor['specialization']}\n"
+                f"- Experience: {top_doctor['experience']} years\n"
+                f"- Rating: {top_doctor['rating']}/5\n"
+                f"- Hospital: {top_doctor['hospital']}\n"
+                f"- Consultation Fee: ${top_doctor['consultationFee']}\n\n"
+                f"Would you like to book an appointment with Dr. {top_doctor['name']}?\n"
+                f"Reply 'yes' to proceed or 'no' to cancel."
+            )
+            
+            return {
+                "message": doctor_message,
+                "agentType": "doctor_matcher",
+                "confidence": 0.95,
+                "requiresInput": True,
+                "newStatus": "confirming_doctor",
+                "newStep": "doctor_confirmation",
+                "extractedData": {
+                    "symptoms": symptoms_text,
+                    "specialization": specialization,
+                    "recommended_doctor": top_doctor,
+                    "doctor_id": top_doctor['id'],
+                    "doctor_name": top_doctor['name']
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in symptom collection: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {
+                "message": "I'm having trouble analyzing your symptoms. Could you please describe them briefly?",
+                "agentType": "symptom_analyzer",
+                "confidence": 0.5,
+                "requiresInput": True,
+                "newStep": "symptom_collection"
+            }
+    
+    async def _handle_doctor_confirmation(
         self,
         message: str,
         conversation_state: Dict[str, Any],
-        conversation_id: str,
-        user_id: str
+        user_id: str,
+        conversation_id: str
     ) -> Dict[str, Any]:
-        """Handle doctor matching and selection phase"""
+        """
+        Handle yes/no confirmation. If yes, book immediately. If no, end conversation.
+        """
         
         try:
-            current_step = conversation_state.get("currentStep", "doctor_recommendation")
-            extracted_data = conversation_state.get("extractedData", {})
+            message_lower = message.lower().strip()
             
-            if current_step == "doctor_recommendation":
-                # Get symptoms data and recommend doctors
-                symptoms_data = extracted_data.get("symptoms", {})
+            # Get doctor data from aiContext.agentData
+            ai_context = conversation_state.get("aiContext", {})
+            agent_data = ai_context.get("agentData", {})
+            
+            logger.info(f"=== DOCTOR CONFIRMATION ===")
+            logger.info(f"User message: {message}")
+            logger.info(f"agentData keys: {list(agent_data.keys())}")
+            
+            doctor_id = agent_data.get("doctor_id")
+            doctor_name = agent_data.get("doctor_name")
+            recommended_doctor = agent_data.get("recommended_doctor", {})
+            symptoms = agent_data.get("symptoms", "Medical consultation")
+            
+            # Check if user said YES
+            if any(word in message_lower for word in ["yes", "yeah", "yep", "sure", "ok", "okay", "proceed", "book", "confirm"]):
                 
-                if not symptoms_data.get("keywords"):
+                if not doctor_id:
+                    logger.error("No doctor_id found in agentData")
                     return {
-                        "message": "I need to understand your symptoms better before I can recommend a doctor. Could you please describe what's bothering you?",
-                        "agentType": "doctor_matcher",
+                        "message": "I'm sorry, I lost track of the doctor selection. Could you describe your symptoms again?",
+                        "agentType": "system",
                         "confidence": 0.5,
                         "requiresInput": True,
-                        "newStatus": "gathering_symptoms",
                         "newStep": "symptom_collection"
                     }
                 
-                # Get doctor recommendations
-                recommendation_result = await self.doctor_matcher.recommend_doctors(
-                    symptoms=symptoms_data.get("keywords", []),
-                    analysis=symptoms_data,
-                    patient_preferences={}
+                # Get next available slot for this doctor
+                logger.info(f"Checking availability for doctor: {doctor_id}")
+                availability_result = await self.booking_coordinator.check_doctor_availability(
+                    doctor_id=str(doctor_id),
+                    days_ahead=7
                 )
                 
-                response = {
-                    "message": recommendation_result["message"],
-                    "agentType": "doctor_matcher",
-                    "confidence": recommendation_result.get("confidence", 0.7),
-                    "options": recommendation_result.get("doctorOptions", []),
-                    "requiresInput": recommendation_result.get("requiresSelection", True)
-                }
+                logger.info(f"Availability result: {availability_result}")
                 
-                # Update extracted data with recommendation
-                if recommendation_result.get("recommendation"):
-                    response["extractedData"] = {
-                        "recommendation": recommendation_result["recommendation"],
-                        "recommendedSpecialization": recommendation_result.get("recommendedSpecialization")
-                    }
+                # Extract available slots from the nested structure
+                available_dates = availability_result.get("available_slots", [])
                 
-                response["newStatus"] = "confirming_doctor"
-                response["newStep"] = "doctor_confirmation"
-                
-                return response
-            
-            elif current_step == "doctor_confirmation":
-                # Handle doctor selection
-                selected_doctor_id = self._extract_doctor_id_from_message(message, conversation_state)
-                
-                if not selected_doctor_id:
+                if not available_dates:
                     return {
-                        "message": "I didn't catch which doctor you'd like to see. Could you please select one from the options I provided?",
-                        "agentType": "doctor_matcher",
-                        "confidence": 0.6,
-                        "requiresInput": True,
-                        "newStep": "doctor_confirmation"
-                    }
-                
-                selection_result = await self.doctor_matcher.handle_doctor_selection(
-                    selected_doctor_id=selected_doctor_id,
-                    user_message=message
-                )
-                
-                response = {
-                    "message": selection_result["message"],
-                    "agentType": "doctor_matcher",
-                    "confidence": 0.8,
-                    "requiresInput": selection_result.get("requiresConfirmation", True)
-                }
-                
-                if selection_result.get("selectedDoctor"):
-                    response["extractedData"] = {
-                        "selectedDoctor": selection_result["selectedDoctor"]["_id"]
-                    }
-                
-                if selection_result.get("nextStep") == "availability_check":
-                    response["newStatus"] = "checking_availability"
-                    response["newStep"] = "slot_selection"
-                
-                return response
-        
-        except Exception as e:
-            logger.error(f"Error in doctor matching: {e}")
-            return {
-                "message": "I'm having trouble with the doctor recommendation. Let me try again.",
-                "agentType": "doctor_matcher",
-                "confidence": 0.5,
-                "requiresInput": True
-            }
-    
-    async def _handle_appointment_booking(
-        self,
-        message: str,
-        conversation_state: Dict[str, Any],
-        conversation_id: str,
-        user_id: str
-    ) -> Dict[str, Any]:
-        """Handle appointment booking phase"""
-        
-        try:
-            current_step = conversation_state.get("currentStep", "slot_selection")
-            extracted_data = conversation_state.get("extractedData", {})
-            
-            if current_step == "slot_selection":
-                # First check if we need to show availability or handle slot selection
-                selected_doctor_id = extracted_data.get("selectedDoctor")
-                
-                if not selected_doctor_id:
-                    return {
-                        "message": "I need to know which doctor you'd like to see. Let me help you select one.",
-                        "agentType": "booking_coordinator",
-                        "confidence": 0.5,
-                        "requiresInput": True,
-                        "newStatus": "confirming_doctor",
-                        "newStep": "doctor_confirmation"
-                    }
-                
-                # Check if user is selecting a slot or we need to show availability
-                slot_data = self._extract_slot_from_message(message, conversation_state)
-                
-                if not slot_data:
-                    # Show availability if no slot selected yet
-                    preferred_date = self._extract_date_from_message(message)
-                    
-                    availability_result = await self.booking_coordinator.check_availability(
-                        doctor_id=selected_doctor_id,
-                        preferred_date=preferred_date,
-                        days_ahead=7
-                    )
-                    
-                    response = {
-                        "message": availability_result["message"],
+                        "message": f"I'm sorry, Dr. {doctor_name} doesn't have available slots in the next week. Would you like to describe your symptoms again to find another doctor?",
                         "agentType": "booking_coordinator",
                         "confidence": 0.8,
-                        "options": availability_result.get("slotOptions", []),
-                        "requiresInput": availability_result.get("hasAvailability", False),
-                        "newStatus": "selecting_slot",
-                        "newStep": "slot_selection"
+                        "requiresInput": True,
+                        "newStep": "symptom_collection"
                     }
-                    
-                    if not availability_result.get("hasAvailability"):
-                        response["newStatus"] = "checking_alternatives"
-                        response["newStep"] = "doctor_confirmation"
-                    
-                    return response
                 
-                # Handle actual slot selection if slot_data exists
+                # Get the FIRST available slot (earliest date, earliest time)
+                first_date = available_dates[0]
+                first_slot_of_day = first_date["slots"][0]
                 
-                # Get symptoms from extracted data
-                symptoms = extracted_data.get("symptoms", {}).get("raw", "Medical consultation")
+                selected_slot = {
+                    "date": first_date["date"],
+                    "startTime": first_slot_of_day["startTime"],
+                    "endTime": first_slot_of_day["endTime"]
+                }
                 
-                selection_result = await self.booking_coordinator.handle_slot_selection(
-                    doctor_id=extracted_data.get("selectedDoctor"),
-                    selected_date=slot_data["date"],
-                    selected_time_slot=slot_data["timeSlot"],
+                logger.info(f"Booking first available slot: {selected_slot}")
+                
+                # Book the appointment immediately
+                booking_result = await self.booking_coordinator.handle_slot_selection(
+                    doctor_id=str(doctor_id),
+                    selected_date=selected_slot["date"],
+                    selected_time_slot={
+                        "startTime": selected_slot["startTime"],
+                        "endTime": selected_slot["endTime"]
+                    },
                     user_id=user_id,
                     symptoms=symptoms,
                     conversation_id=conversation_id
                 )
                 
-                response = {
-                    "message": selection_result["message"],
+                if booking_result.get("slotUnavailable"):
+                    return {
+                        "message": booking_result["message"] + "\n\nWould you like to try again?",
+                        "agentType": "booking_coordinator",
+                        "confidence": 0.7,
+                        "requiresInput": True,
+                        "newStep": "symptom_collection"
+                    }
+                
+                # Confirm booking
+                appointment_data = booking_result.get("appointmentData")
+                
+                if appointment_data:
+                    confirmation_result = await self.booking_coordinator.confirm_booking(appointment_data)
+                    
+                    if confirmation_result.get("bookingSuccessful"):
+                        # Format confirmation message
+                        try:
+                            date_obj = datetime.fromisoformat(selected_slot.get("date", ""))
+                            date_str = date_obj.strftime("%A, %B %d, %Y")
+                        except:
+                            date_str = selected_slot.get("date", "")
+                        
+                        confirmation_message = (
+                            f"Appointment Confirmed!\n\n"
+                            f"Doctor: Dr. {doctor_name}\n"
+                            f"Specialization: {recommended_doctor.get('specialization', 'N/A')}\n"
+                            f"Date: {date_str}\n"
+                            f"Time: {selected_slot.get('startTime', '')} - {selected_slot.get('endTime', '')}\n"
+                            f"Hospital: {recommended_doctor.get('hospital', 'N/A')}\n"
+                            f"Consultation Fee: ${recommended_doctor.get('consultationFee', 0)}\n"
+                            f"Appointment ID: {confirmation_result.get('appointmentId', 'N/A')}\n\n"
+                            f"A confirmation email has been sent to your registered email address.\n\n"
+                            f"Important:\n"
+                            f"- Please arrive 15 minutes early\n"
+                            f"- Bring a valid ID and medical records if any\n\n"
+                            f"Thank you for using MediGo! Take care!"
+                        )
+                        
+                        return {
+                            "message": confirmation_message,
+                            "agentType": "booking_coordinator",
+                            "confidence": 1.0,
+                            "requiresInput": False,
+                            "newStatus": "completed",
+                            "newStep": "completed",
+                            "appointmentId": confirmation_result["appointmentId"]
+                        }
+                
+                return {
+                    "message": "Your appointment has been booked! You should receive a confirmation email shortly.",
                     "agentType": "booking_coordinator",
                     "confidence": 0.9,
-                    "requiresInput": selection_result.get("requiresConfirmation", True)
+                    "requiresInput": False,
+                    "newStatus": "completed",
+                    "newStep": "completed"
                 }
-                
-                if selection_result.get("appointmentData"):
-                    response["extractedData"] = {
-                        "appointmentData": selection_result["appointmentData"],
-                        "selectedSlot": {
-                            "date": selection_result["appointmentDate"],
-                            "timeSlot": selection_result["timeSlot"]
-                        }
-                    }
-                
-                if selection_result.get("nextStep") == "final_confirmation":
-                    response["newStatus"] = "confirming_appointment"
-                    response["newStep"] = "appointment_confirmation"
-                
-                return response
             
-            elif current_step == "appointment_confirmation":
-                # Handle final confirmation
-                if self._is_confirmation_positive(message):
-                    appointment_data = extracted_data.get("appointmentData")
-                    
-                    if not appointment_data:
-                        return {
-                            "message": "I'm missing some appointment details. Let me start the booking process again.",
-                            "agentType": "booking_coordinator",
-                            "confidence": 0.5,
-                            "requiresInput": True,
-                            "newStatus": "checking_availability",
-                            "newStep": "slot_selection"
-                        }
-                    
-                    booking_result = await self.booking_coordinator.confirm_booking(appointment_data)
-                    
-                    response = {
-                        "message": booking_result["message"],
-                        "agentType": "booking_coordinator",
-                        "confidence": 1.0,
-                        "requiresInput": False
-                    }
-                    
-                    if booking_result.get("bookingSuccessful"):
-                        response["appointmentId"] = booking_result["appointmentId"]
-                        response["newStatus"] = "completed"
-                        response["newStep"] = "completed"
-                    else:
-                        response["newStatus"] = "selecting_slot"
-                        response["newStep"] = "slot_selection"
-                        response["requiresInput"] = True
-                    
-                    return response
-                else:
-                    return {
-                        "message": "No problem! Would you like to select a different time slot or make any other changes?",
-                        "agentType": "booking_coordinator",
-                        "confidence": 0.8,
-                        "requiresInput": True,
-                        "newStatus": "selecting_slot",
-                        "newStep" : "slot_selection"
-                    }
-        
+            # Check if user said NO
+            elif any(word in message_lower for word in ["no", "nope", "nah", "cancel", "don't", "dont"]):
+                return {
+                    "message": "No problem! If you need medical assistance in the future, feel free to start a new conversation. Take care!",
+                    "agentType": "system",
+                    "confidence": 1.0,
+                    "requiresInput": False,
+                    "newStatus": "completed",
+                    "newStep": "completed"
+                }
+            
+            # Unclear response
+            else:
+                return {
+                    "message": f"I didn't catch that. Would you like to book an appointment with Dr. {doctor_name}? Please reply 'yes' or 'no'.",
+                    "agentType": "doctor_matcher",
+                    "confidence": 0.6,
+                    "requiresInput": True,
+                    "newStep": "doctor_confirmation"
+                }
+            
         except Exception as e:
-            logger.error(f"Error in appointment booking: {e}")
+            logger.error(f"Error in doctor confirmation: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return {
-                "message": "I'm having trouble with the appointment booking. Let me try to help you in a different way.",
-                "agentType": "booking_coordinator",
+                "message": "I'm having trouble processing your response. Please reply 'yes' to book or 'no' to cancel.",
+                "agentType": "system",
                 "confidence": 0.5,
-                "requiresInput": True
-            }
-    
-    async def _handle_general_inquiry(
-        self, 
-        message: str, 
-        conversation_state: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Handle general inquiries or unclear messages"""
-        
-        # Generate a contextual response using Gemini
-        try:
-            response_text = await self.gemini_client.generate_conversational_response(
-                context=conversation_state,
-                agent_type="general"
-            )
-            
-            return {
-                "message": response_text,
-                "agentType": "general",
-                "confidence": 0.6,
                 "requiresInput": True,
-                "suggestions": ["Tell me about your symptoms", "Find a doctor", "Book an appointment"]
+                "newStep": "doctor_confirmation"
             }
+    
+    
+    def _handle_completed(self, message: str) -> Dict[str, Any]:
+        """Handle messages after appointment is completed"""
+        return {
+            "message": "Your appointment has been confirmed! If you need to make another appointment or have questions, please start a new conversation.",
+            "agentType": "system",
+            "confidence": 1.0,
+            "requiresInput": False,
+            "newStep": "completed"
+        }
+    
+    def _handle_general_inquiry(self, message: str) -> Dict[str, Any]:
+        """Handle unclear messages"""
+        return {
+            "message": "I'm here to help you book a medical appointment. Please describe your symptoms or health concern so I can find the right doctor for you.",
+            "agentType": "system",
+            "confidence": 0.7,
+            "requiresInput": True,
+            "newStep": "symptom_collection"
+        }
+    
+    # ===== HELPER METHODS =====
+    
+    def _extract_specialization_from_message(self, message: str) -> Dict[str, Any]:
+        """Fallback method to extract specialization from message when AI parsing fails"""
+        
+        message_lower = message.lower()
+        
+        # Map of keywords to specializations
+        specialization_keywords = {
+            "Cardiology": ["cardiologist", "cardiology", "heart", "ecg", "ekg", "cardiac", "chest pain", "blood pressure"],
+            "Dermatology": ["dermatologist", "dermatology", "skin", "rash", "acne", "eczema"],
+            "Pediatrics": ["pediatrician", "pediatrics", "child", "baby", "infant", "kid"],
+            "Orthopedics": ["orthopedic", "orthopedics", "bone", "joint", "fracture", "sprain"],
+            "Neurology": ["neurologist", "neurology", "brain", "headache", "migraine", "seizure"],
+            "Gastroenterology": ["gastroenterologist", "gastroenterology", "stomach", "digestion", "gastro"],
+            "Gynecology": ["gynecologist", "gynecology", "gynae", "women's health", "pregnancy"],
+            "Psychiatry": ["psychiatrist", "psychiatry", "mental health", "depression", "anxiety"],
+            "Endocrinology": ["endocrinologist", "endocrinology", "diabetes", "thyroid", "hormone"],
+            "Ophthalmology": ["ophthalmologist", "ophthalmology", "eye", "vision", "opthal"]
+        }
+        
+        # Check for direct matches
+        for specialization, keywords in specialization_keywords.items():
+            if any(keyword in message_lower for keyword in keywords):
+                return {
+                    "symptoms": [message],
+                    "specialization": specialization,
+                    "severity": "moderate"
+                }
+        
+        # Default fallback
+        return {
+            "symptoms": [message],
+            "specialization": "General Medicine",
+            "severity": "moderate"
+        }
+    
+    def _build_streamlined_symptom_prompt(self, context: Dict[str, Any]) -> str:
+        """Build a streamlined prompt that doesn't over-analyze"""
+        
+        message = context["current_message"]
+        
+        return f"""You are a medical assistant. The patient said: "{message}"
+
+Your task: Extract symptoms and recommend ONE medical specialization.
+
+Available specializations in our system:
+- Cardiology (heart, chest pain, ECG, palpitations, blood pressure)
+- Dermatology (skin, rash, acne, hair, nails)
+- General Medicine (fever, cold, flu, general checkup)
+- Orthopedics (bones, joints, fractures, back pain, knee pain)
+- Neurology (headache, migraine, dizziness, seizures)
+- Pediatrics (children, baby, infant care)
+- Gastroenterology (stomach, digestion, nausea, diarrhea)
+- Gynecology (women's health, pregnancy, periods)
+- Psychiatry (mental health, anxiety, depression)
+- Endocrinology (diabetes, thyroid, hormones)
+- Ophthalmology (eyes, vision problems)
+
+IMPORTANT: 
+- If the user explicitly mentions a specialization (e.g., "cardiologist", "dermatologist"), use that specialization.
+- If the user mentions a specific procedure (e.g., "ECG", "X-ray"), match it to the relevant specialization.
+- Extract actual symptoms if mentioned, or use the reason for visit.
+
+Respond with JSON only (no markdown, no code blocks):
+{{
+    "symptoms": ["reason for visit or symptoms"],
+    "specialization": "exact match from list above",
+    "severity": "mild|moderate|severe|urgent"
+}}
+
+Only mark as "urgent" if life-threatening (chest pain, severe bleeding, difficulty breathing, unconscious)."""
+    
+    async def _find_doctors_by_specialization(self, specialization: str) -> List[Dict[str, Any]]:
+        """Find available doctors for a specialization"""
+        
+        try:
+            # Query database for doctors
+            db = self.db.db  # Use self.db.db instead of self.db.database
+            doctors_collection = db.doctors
+            
+            logger.info(f"Searching for doctors with specialization: {specialization}")
+            
+            doctors_cursor = doctors_collection.find({
+                "specialization": specialization,
+                "isActive": True
+            }).sort("rating", -1).limit(5)
+            
+            doctors = await doctors_cursor.to_list(length=None)
+            
+            logger.info(f"Found {len(doctors)} doctors for {specialization}")
+            
+            # Format doctor data
+            formatted_doctors = []
+            for doc in doctors:
+                formatted_doctors.append({
+                    "id": str(doc["_id"]),
+                    "_id": str(doc["_id"]),
+                    "name": doc.get("name", ""),
+                    "specialization": doc.get("specialization", ""),
+                    "experience": doc.get("experience", 0),
+                    "rating": doc.get("rating", 4.0),
+                    "hospital": doc.get("hospital", ""),
+                    "consultationFee": doc.get("consultationFee", 0),
+                    "languages": doc.get("languages", [])
+                })
+            
+            return formatted_doctors
+            
         except Exception as e:
-            logger.error(f"Error in general inquiry handling: {e}")
-            return {
-                "message": "Hi! I'm here to help you find the right doctor and book an appointment. Could you please tell me about your symptoms or what kind of medical assistance you need?",
-                "agentType": "general",
-                "confidence": 0.5,
-                "requiresInput": True
-            }
+            logger.error(f"Error finding doctors: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
     
-    # Helper methods for extracting information from messages
-    def _extract_doctor_id_from_message(
+    def _format_doctor_options_message(
+        self, 
+        doctors: List[Dict[str, Any]], 
+        symptoms: str,
+        specialization: str
+    ) -> str:
+        """Format doctor options in a clear message"""
+        
+        if len(doctors) == 1:
+            doc = doctors[0]
+            return (f"Based on your symptoms ({symptoms}), I recommend seeing a {specialization} specialist.\n\n"
+                   f"I found Dr. {doc['name']} who can help you:\n"
+                   f"• Experience: {doc['experience']} years\n"
+                   f"• Rating: {doc['rating']}/5\n"
+                   f"• Hospital: {doc['hospital']}\n"
+                   f"• Consultation Fee: ${doc['consultationFee']}\n\n"
+                   f"Would you like to book an appointment with Dr. {doc['name']}? (Reply 'yes' or '1')")
+        
+        message = f"Based on your symptoms ({symptoms}), I recommend seeing a {specialization} specialist.\n\n"
+        message += f"I found {len(doctors)} available doctors:\n\n"
+        
+        for i, doc in enumerate(doctors, 1):
+            message += f"{i}. **Dr. {doc['name']}**\n"
+            message += f"   • Experience: {doc['experience']} years | Rating: {doc['rating']}/5\n"
+            message += f"   • Hospital: {doc['hospital']}\n"
+            message += f"   • Fee: ${doc['consultationFee']}\n\n"
+        
+        message += "Please choose a doctor by number (e.g., '1', '2') or by name."
+        
+        return message
+    
+    def _format_doctor_selection_options(self, doctors: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Format doctor selection options for UI"""
+        
+        options = []
+        for i, doc in enumerate(doctors, 1):
+            options.append({
+                "id": f"doctor_{i}",
+                "label": f"Dr. {doc['name']} - {doc['specialization']}",
+                "value": doc['id'],
+                "metadata": {
+                    "experience": doc['experience'],
+                    "rating": doc['rating'],
+                    "fee": doc['consultationFee']
+                }
+            })
+        
+        return options
+    
+    def _format_booking_slots_message(
+        self,
+        doctor: Dict[str, Any],
+        slots: List[Dict[str, Any]]
+    ) -> str:
+        """Format available booking slots message"""
+        
+        message = f"Great! Here are available time slots with Dr. {doctor['name']}:\n\n"
+        
+        # Group slots by date
+        slots_by_date = {}
+        for slot in slots[:10]:  # Limit to 10 slots
+            date = slot.get("date", "")
+            if date not in slots_by_date:
+                slots_by_date[date] = []
+            slots_by_date[date].append(slot)
+        
+        slot_index = 1
+        for date, date_slots in slots_by_date.items():
+            # Format date nicely
+            try:
+                date_obj = datetime.fromisoformat(date)
+                date_str = date_obj.strftime("%A, %B %d, %Y")
+            except:
+                date_str = date
+            
+            message += f"**{date_str}**\n"
+            for slot in date_slots:
+                start_time = slot.get("startTime", "")
+                end_time = slot.get("endTime", "")
+                message += f"{slot_index}. {start_time} - {end_time}\n"
+                slot_index += 1
+            message += "\n"
+        
+        message += "Please choose a time slot by number (e.g., '1', '2')."
+        
+        return message
+    
+    def _format_time_slot_options(self, slots: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Format time slot options for UI"""
+        
+        options = []
+        for i, slot in enumerate(slots[:10], 1):
+            try:
+                date_obj = datetime.fromisoformat(slot.get("date", ""))
+                date_str = date_obj.strftime("%b %d, %Y")
+            except:
+                date_str = slot.get("date", "")
+            
+            options.append({
+                "id": f"slot_{i}",
+                "label": f"{date_str} at {slot.get('startTime', '')}",
+                "value": i,
+                "metadata": {
+                    "date": slot.get("date"),
+                    "startTime": slot.get("startTime"),
+                    "endTime": slot.get("endTime")
+                }
+            })
+        
+        return options
+    
+    def _format_confirmation_message(
+        self,
+        doctor: Dict[str, Any],
+        slot: Dict[str, Any],
+        appointment_id: str
+    ) -> str:
+        """Format appointment confirmation message"""
+        
+        try:
+            date_obj = datetime.fromisoformat(slot.get("date", ""))
+            date_str = date_obj.strftime("%A, %B %d, %Y")
+        except:
+            date_str = slot.get("date", "")
+        
+        message = "✅ **Appointment Confirmed!**\n\n"
+        message += f"**Doctor:** Dr. {doctor['name']}\n"
+        message += f"**Specialization:** {doctor['specialization']}\n"
+        message += f"**Date:** {date_str}\n"
+        message += f"**Time:** {slot.get('startTime', '')} - {slot.get('endTime', '')}\n"
+        message += f"**Hospital:** {doctor['hospital']}\n"
+        message += f"**Consultation Fee:** ${doctor['consultationFee']}\n"
+        message += f"**Appointment ID:** {appointment_id}\n\n"
+        message += "📧 **A confirmation email has been sent to your registered email address.**\n\n"
+        message += "**Important Notes:**\n"
+        message += "• Please arrive 15 minutes early\n"
+        message += "• Bring a valid ID and any previous medical records\n"
+        message += "• If you need to cancel or reschedule, please do so at least 24 hours in advance\n\n"
+        message += "Thank you for choosing MediGo! Take care! 🏥"
+        
+        return message
+    
+    def _extract_doctor_selection(
         self, 
         message: str, 
-        conversation_state: Dict[str, Any]
-    ) -> Optional[str]:
-        """Extract doctor ID from user message"""
-        
-        # This is a simplified implementation
-        # In a real system, you might use NLP to better understand user selection
-        
-        # Look for patterns like "doctor 1", "first one", "Dr. Smith", etc.
-        message_lower = message.lower()
-        
-        # Check if user mentioned a specific choice
-        if "first" in message_lower or "1" in message:
-            # Get first doctor from conversation state
-            extracted_data = conversation_state.get("extractedData", {})
-            # This would need to be implemented based on how you store the options
-            pass
-        
-        # For now, return None - this would need proper implementation
-        return None
-    
-    def _extract_date_from_message(self, message: str) -> Optional[str]:
-        """Extract preferred date from user message"""
-        
-        # This is a simplified implementation
-        # In a real system, you'd use NLP to extract dates like "tomorrow", "next Monday", etc.
-        
-        message_lower = message.lower()
-        today = datetime.now().date()
-        
-        if "tomorrow" in message_lower:
-            date = today + timedelta(days=1)
-            return date.isoformat()
-        elif "today" in message_lower:
-            return today.isoformat()
-        
-        return None
-    
-    def _extract_slot_from_message(
-        self, 
-        message: str, 
-        conversation_state: Dict[str, Any]
+        doctors: List[Dict[str, Any]]
     ) -> Optional[Dict[str, Any]]:
-        """Extract selected time slot from user message"""
+        """Extract doctor selection from user message"""
         
-        # This would need proper implementation with NLP
-        # For now, return None
+        message_lower = message.lower().strip()
+        
+        # Check for numeric selection
+        if message_lower in ["1", "first", "one"] and len(doctors) >= 1:
+            return doctors[0]
+        if message_lower in ["2", "second", "two"] and len(doctors) >= 2:
+            return doctors[1]
+        if message_lower in ["3", "third", "three"] and len(doctors) >= 3:
+            return doctors[2]
+        if message_lower in ["4", "fourth", "four"] and len(doctors) >= 4:
+            return doctors[3]
+        if message_lower in ["5", "fifth", "five"] and len(doctors) >= 5:
+            return doctors[4]
+        
+        # Try to extract number
+        for char in message:
+            if char.isdigit():
+                try:
+                    index = int(char) - 1
+                    if 0 <= index < len(doctors):
+                        return doctors[index]
+                except:
+                    pass
+        
+        # Check for name match
+        for doctor in doctors:
+            doctor_name = doctor.get("name", "").lower()
+            if doctor_name in message_lower or any(part in message_lower for part in doctor_name.split()):
+                return doctor
+        
+        # If only one doctor and user says yes/ok/sure
+        if len(doctors) == 1 and any(word in message_lower for word in ["yes", "ok", "sure", "book", "proceed"]):
+            return doctors[0]
+        
         return None
     
-    def _is_confirmation_positive(self, message: str) -> bool:
-        """Check if message is a positive confirmation"""
+    def _extract_slot_selection(
+        self,
+        message: str,
+        slots: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """Extract slot selection from user message"""
         
-        positive_words = ["yes", "confirm", "book", "okay", "ok", "sure", "proceed", "go ahead"]
-        negative_words = ["no", "cancel", "change", "different", "not"]
+        message_lower = message.lower().strip()
         
-        message_lower = message.lower()
+        # Check for numeric selection
+        number_words = {
+            "1": 0, "first": 0, "one": 0,
+            "2": 1, "second": 1, "two": 1,
+            "3": 2, "third": 2, "three": 2,
+            "4": 3, "fourth": 3, "four": 3,
+            "5": 4, "fifth": 4, "five": 4,
+            "6": 5, "sixth": 5, "six": 5,
+            "7": 6, "seventh": 6, "seven": 6,
+            "8": 7, "eighth": 7, "eight": 8,
+            "9": 8, "ninth": 8, "nine": 8,
+            "10": 9, "tenth": 9, "ten": 9
+        }
         
-        has_positive = any(word in message_lower for word in positive_words)
-        has_negative = any(word in message_lower for word in negative_words)
+        for word, index in number_words.items():
+            if word in message_lower and index < len(slots):
+                return slots[index]
         
-        return has_positive and not has_negative
+        # Try to extract number directly
+        for char in message:
+            if char.isdigit():
+                try:
+                    index = int(char) - 1
+                    if 0 <= index < len(slots):
+                        return slots[index]
+                except:
+                    pass
+        
+        return None
     
     # Workflow management methods
     async def get_conversation_state(self, conversation_id: str) -> Optional[Dict[str, Any]]:
@@ -636,13 +746,11 @@ class EnhancedMedicalConsultationWorkflow:
     async def end_conversation(self, conversation_id: str) -> bool:
         """End and cleanup a conversation"""
         try:
-            # Update conversation in database to inactive
             success = await self.db.update_conversation_state(
                 conversation_id, 
                 {"isActive": False, "status": "cancelled"}
             )
             
-            # Remove from active conversations
             if conversation_id in self.active_conversations:
                 del self.active_conversations[conversation_id]
             
@@ -662,324 +770,3 @@ class EnhancedMedicalConsultationWorkflow:
     async def cleanup_expired_conversations(self):
         """Cleanup expired conversations"""
         await self.db.cleanup_expired_conversations()
-    
-    # ===== ENHANCED HELPER METHODS =====
-    
-    def _parse_analysis_fallback(self, ai_response: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Fallback parsing when JSON parsing fails"""
-        
-        # Extract key information using simple patterns
-        symptoms = context["medical_context"]["detected_symptoms"].keys()
-        available_specs = list(context["database_context"]["specializations"].keys())
-        
-        return {
-            "analysis": ai_response[:500],  # Truncated response
-            "extracted_symptoms": list(symptoms),
-            "severity": "moderate",  # Safe default
-            "recommended_specializations": available_specs[:2],  # First 2 available
-            "confidence": 0.6,
-            "follow_up_questions": ["How long have you been experiencing these symptoms?"],
-            "reasoning": "Fallback analysis due to parsing error"
-        }
-    
-    def _validate_analysis_against_database(self, analysis: Dict[str, Any], db_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate analysis results against actual database content"""
-        
-        # Ensure recommended specializations exist in database
-        available_specializations = set(db_context["specializations"].keys())
-        recommended = analysis.get("recommended_specializations", [])
-        
-        valid_specializations = [spec for spec in recommended if spec in available_specializations]
-        
-        # Fallback to General Medicine if no valid specializations
-        if not valid_specializations:
-            if "General Medicine" in available_specializations:
-                valid_specializations = ["General Medicine"]
-            else:
-                valid_specializations = list(available_specializations)[:1]
-        
-        # Update analysis with validated data
-        validated_analysis = analysis.copy()
-        validated_analysis["recommended_specializations"] = valid_specializations
-        validated_analysis["validation_applied"] = True
-        
-        return validated_analysis
-    
-    def _determine_symptom_analysis_next_step(self, analysis: Dict[str, Any], context: Dict[str, Any]) -> Tuple[str, str]:
-        """Determine next step based on analysis completeness"""
-        
-        symptoms = analysis.get("extracted_symptoms", [])
-        confidence = analysis.get("confidence", 0.0)
-        
-        # If we have successfully extracted symptoms, let's be more confident
-        if len(symptoms) >= 2:
-            confidence = max(confidence, 0.8) # Boost confidence if we have solid symptoms
-
-        severity = analysis.get("severity", "moderate")
-        booking_intent = analysis.get("booking_intent_detected", False)
-        needs_clarification = analysis.get("needs_symptom_clarification", False)
-        
-        # If booking intent detected but no symptoms, stay in symptom collection
-        if booking_intent and needs_clarification and not symptoms:
-            return "symptom_collection", "gathering_symptoms"
-        
-        # If high confidence and symptoms extracted, move to doctor recommendation
-        if confidence > 0.7 and symptoms and severity != "urgent":
-            return "doctor_recommendation", "recommending_doctor"
-        
-        # If urgent, fast-track to doctor recommendation
-        elif severity == "urgent":
-            return "doctor_recommendation", "urgent_referral"
-        
-        # Otherwise, continue symptom clarification
-        else:
-            return "symptom_clarification", "gathering_symptoms"
-    
-    def _format_symptom_analysis_response(self, analysis: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Format user-friendly symptom analysis response"""
-        
-        symptoms = analysis.get("extracted_symptoms", [])
-        severity = analysis.get("severity", "moderate")
-        reasoning = analysis.get("analysis", "")
-        booking_intent = analysis.get("booking_intent_detected", False)
-        needs_clarification = analysis.get("needs_symptom_clarification", False)
-        
-        # Handle appointment request without symptoms
-        if booking_intent and needs_clarification and not symptoms:
-            return ("I'd be happy to help you find a doctor and book an appointment! However, to recommend the most suitable "
-                   "specialist for you, I need to understand what health concerns or symptoms you'd like to address. "
-                   "Could you please describe what's been bothering you or what type of medical care you're seeking?")
-        
-        # Handle urgent symptoms
-        if severity == "urgent":
-            return f"Based on your symptoms ({', '.join(symptoms)}), I recommend seeking immediate medical attention. {reasoning[:200]}..."
-        
-        # Handle identified symptoms
-        elif symptoms:
-            return f"I understand you're experiencing {', '.join(symptoms)}. {reasoning[:300]}..."
-        
-        # Default symptom clarification
-        else:
-            return "I'd like to better understand your symptoms to provide the most appropriate recommendations."
-    
-    async def _validate_recommended_doctors(self, recommended_docs: List[Dict], db_context: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Validate that recommended doctors exist in database and format them properly"""
-        
-        validated_doctors = []
-        doctor_mapping = db_context["doctors"]
-        
-        for rec_doc in recommended_docs:
-            doctor_id = rec_doc.get("doctor_id", "")
-            
-            if doctor_id in doctor_mapping:
-                real_doctor = doctor_mapping[doctor_id]
-                validated_doctors.append({
-                    "id": doctor_id,
-                    "name": real_doctor["name"],
-                    "specialization": real_doctor["specialization"],
-                    "rating": real_doctor["rating"],
-                    "experience": real_doctor["experience"],
-                    "location": real_doctor["location"],
-                    "hospital": real_doctor["hospital"],
-                    "consultation_fee": real_doctor["consultation_fee"],
-                    "match_score": rec_doc.get("match_score", 0.8),
-                    "match_reasoning": rec_doc.get("match_reasoning", "Suitable for your condition")
-                })
-        
-        return validated_doctors
-    
-    def _parse_doctor_matching_fallback(self, ai_response: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Fallback doctor matching when JSON parsing fails"""
-        
-        # Get available doctors from database
-        db_context = context["database_context"]
-        available_doctors = list(db_context["doctors"].items())[:3]  # Top 3
-        
-        matched_doctors = []
-        for doc_id, doc_info in available_doctors:
-            matched_doctors.append({
-                "doctor_id": doc_id,
-                "name": doc_info["name"],
-                "specialization": doc_info["specialization"],
-                "match_score": 0.7,
-                "match_reasoning": "Available for consultation"
-            })
-        
-        return {
-            "matched_doctors": matched_doctors,
-            "recommendation_message": "I found several doctors who can help with your condition.",
-            "confidence": 0.7,
-            "specialization_used": "General Medicine"
-        }
-    
-    def _create_fallback_doctor_response(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Create fallback response when no doctors match"""
-        
-        # Get any available doctors as fallback
-        db_context = context["database_context"]
-        fallback_doctors = list(db_context["doctors"].items())[:2]
-        
-        if fallback_doctors:
-            doctors_list = []
-            for doc_id, doc_info in fallback_doctors:
-                doctors_list.append({
-                    "id": doc_id,
-                    "name": doc_info["name"],
-                    "specialization": doc_info["specialization"],
-                    "rating": doc_info["rating"]
-                })
-            
-            return {
-                "message": f"I found {len(doctors_list)} doctors who can help with general medical consultation.",
-                "agentType": "doctor_matcher",
-                "confidence": 0.6,
-                "options": self._format_doctor_options(doctors_list),
-                "requiresInput": True,
-                "newStatus": "confirming_doctor",
-                "newStep": "doctor_confirmation",
-                "extractedData": {"matched_doctors": doctors_list}
-            }
-        
-        return self._create_error_response("doctor_matcher", "I'm having trouble finding available doctors at the moment.")
-    
-    def _format_doctor_recommendation_message(self, doctors: List[Dict[str, Any]], context: Dict[str, Any]) -> str:
-        """Format comprehensive doctor recommendation message"""
-        
-        if not doctors:
-            return "I'm having trouble finding suitable doctors for your condition."
-        
-        if len(doctors) == 1:
-            doc = doctors[0]
-            return f"I found an excellent doctor for your condition:\n\n**{doc['name']}** - {doc['specialization']}\n- Rating: {doc['rating']}/5\n- Experience: {doc['experience']} years\n- Location: {doc['location']}\n- Hospital: {doc['hospital']}\n\nWould you like to book an appointment?"
-        
-        else:
-            message = f"I found {len(doctors)} doctors who can help with your condition:\n\n"
-            for i, doc in enumerate(doctors[:3], 1):  # Limit to top 3
-                message += f"{i}. **{doc['name']}** - {doc['specialization']}\n"
-                message += f"   Rating: {doc['rating']}/5, Experience: {doc['experience']} years\n"
-                message += f"   Location: {doc['location']}, Fee: ${doc['consultation_fee']}\n\n"
-            
-            message += "Which doctor would you prefer, or would you like more information about any of them?"
-            return message
-    
-    def _format_doctor_options(self, doctors: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Format doctor options for UI selection"""
-        
-        options = []
-        for i, doc in enumerate(doctors):
-            options.append({
-                "id": f"doctor_{i+1}",
-                "label": f"{doc['name']} - {doc['specialization']}",
-                "value": doc['id'],
-                "metadata": {
-                    "rating": doc['rating'],
-                    "experience": doc['experience'],
-                    "location": doc.get('location', ''),
-                    "fee": doc.get('consultation_fee', 0)
-                }
-            })
-        
-        return options
-    
-    async def _handle_doctor_selection_with_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle doctor selection with comprehensive context awareness"""
-        
-        message = context["current_message"].lower()
-        conversation_state = context["conversation_state"]
-        extracted_data = conversation_state.get("extractedData", {})
-        matched_doctors = extracted_data.get("matched_doctors", [])
-        
-        # Enhanced doctor selection logic
-        selected_doctor = None
-        
-        # Check for numerical selection
-        for i, word in enumerate(["first", "1", "one"]):
-            if word in message and matched_doctors:
-                selected_doctor = matched_doctors[0]
-                break
-        
-        for i, word in enumerate(["second", "2", "two"]):
-            if word in message and len(matched_doctors) > 1:
-                selected_doctor = matched_doctors[1]
-                break
-        
-        # Check for name-based selection
-        if not selected_doctor:
-            for doctor in matched_doctors:
-                doctor_name = doctor.get("name", "").lower()
-                if any(name_part in message for name_part in doctor_name.split()):
-                    selected_doctor = doctor
-                    break
-        
-        if not selected_doctor:
-            return {
-                "message": "I didn't catch which doctor you'd like to see. Could you please select one from the options I provided?",
-                "agentType": "doctor_matcher",
-                "confidence": 0.6,
-                "requiresInput": True,
-                "newStep": "doctor_confirmation"
-            }
-        
-        # Proceed to appointment booking
-        return {
-            "message": f"Great choice! You've selected **{selected_doctor['name']}**. Let me check their availability for you.",
-            "agentType": "booking_coordinator",
-            "confidence": 0.9,
-            "requiresInput": True,
-            "newStatus": "checking_availability",
-            "newStep": "slot_selection",
-            "extractedData": {
-                "selected_doctor": selected_doctor,
-                "booking_context": {
-                    "specialization": selected_doctor["specialization"],
-                    "fee": selected_doctor.get("consultation_fee", "TBD"),
-                    "hospital": selected_doctor.get("hospital", "")
-                }
-            }
-        }
-    
-    def _create_error_response(self, agent_type: str, message: str) -> Dict[str, Any]:
-        """Create standardized error response"""
-        
-        return {
-            "message": message,
-            "agentType": agent_type,
-            "confidence": 0.5,
-            "requiresInput": True,
-            "suggestions": ["Could you please try rephrasing your message?"],
-            "options": [],
-            "metadata": {
-                "error": True,
-                "requiresInput": True,
-                "isComplete": False
-            }
-        }
-    
-    def _create_fallback_booking_response(self, selected_doctor: Dict[str, Any]) -> Dict[str, Any]:
-        """Create fallback booking response when AI parsing fails"""
-        
-        # Generate basic available slots (next 3 days, 9 AM - 5 PM)
-        available_slots = []
-        base_date = datetime.now().date()
-        
-        for i in range(1, 4):  # Next 3 days
-            date = base_date + timedelta(days=i)
-            day_name = date.strftime("%A")
-            
-            # Basic morning and afternoon slots
-            available_slots.extend([
-                {"date": date.isoformat(), "time": "09:00", "day_of_week": day_name},
-                {"date": date.isoformat(), "time": "14:00", "day_of_week": day_name},
-                {"date": date.isoformat(), "time": "16:00", "day_of_week": day_name}
-            ])
-        
-        return {
-            "available_slots": available_slots,
-            "booking_message": f"Here are available appointments with **{selected_doctor.get('name', 'the selected doctor')}**. Please choose a convenient time slot.",
-            "requires_confirmation": True,
-            "consultation_details": {
-                "doctor": selected_doctor.get("name", "Unknown"),
-                "fee": selected_doctor.get("consultation_fee", "TBD"),
-                "location": selected_doctor.get("hospital", "TBD")
-            }
-        }

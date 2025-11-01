@@ -119,6 +119,7 @@ const conversationSchema = new mongoose.Schema({
         pendingQuestions: [String],
         clarificationNeeded: Boolean,
         conversationSummary: String,
+        agentData: mongoose.Schema.Types.Mixed, // Store workflow data (doctors, slots, etc.)
         userPreferences: {
             communicationStyle: String, // formal, casual, brief, detailed
             preferredTime: String, // morning, afternoon, evening
