@@ -250,6 +250,117 @@ export const sendPasswordChangeConfirmationEmail = async (email, firstName) => {
 };
 
 /**
+ * Send appointment confirmation email
+ * @param {string} email 
+ * @param {string} firstName 
+ * @param {object} appointmentDetails 
+ */
+export const sendAppointmentConfirmationEmail = async (email, firstName, appointmentDetails) => {
+    try {
+        const transporter = createTransporter();
+        
+        const { appointmentId, doctorName, specialization, date, time, hospital, consultationFee } = appointmentDetails;
+
+        const mailOptions = {
+            from: {
+                name: 'MediGo Appointments',
+                address: process.env.EMAIL_USER
+            },
+            to: email,
+            subject: `Appointment Confirmed - Dr. ${doctorName} - MediGo`,
+            html: `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Appointment Confirmation - MediGo</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .container { background: #f9f9f9; padding: 30px; border-radius: 10px; }
+                        .header { text-align: center; color: #28a745; margin-bottom: 30px; }
+                        .appointment-card { background: white; padding: 20px; border-radius: 8px; border: 2px solid #28a745; margin: 20px 0; }
+                        .detail-row { padding: 10px 0; border-bottom: 1px solid #eee; }
+                        .detail-label { font-weight: bold; color: #666; }
+                        .detail-value { color: #333; margin-top: 5px; }
+                        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+                        .instructions { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>Appointment Confirmed</h1>
+                            <p>Your appointment has been successfully booked</p>
+                        </div>
+                        
+                        <p>Hi <strong>${firstName}</strong>,</p>
+                        
+                        <p>Your appointment with Dr. ${doctorName} has been confirmed. Here are your appointment details:</p>
+                        
+                        <div class="appointment-card">
+                            <div class="detail-row">
+                                <div class="detail-label">Appointment ID</div>
+                                <div class="detail-value"><strong>${appointmentId}</strong></div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Doctor</div>
+                                <div class="detail-value">Dr. ${doctorName}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Specialization</div>
+                                <div class="detail-value">${specialization}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Date</div>
+                                <div class="detail-value">${date}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Time</div>
+                                <div class="detail-value">${time}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Hospital</div>
+                                <div class="detail-value">${hospital}</div>
+                            </div>
+                            <div class="detail-row" style="border-bottom: none;">
+                                <div class="detail-label">Consultation Fee</div>
+                                <div class="detail-value">$${consultationFee}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="instructions">
+                            <strong>Important Instructions:</strong>
+                            <ul>
+                                <li>Please arrive 15 minutes before your scheduled appointment</li>
+                                <li>Bring a valid ID and any relevant medical records</li>
+                                <li>If you need to cancel or reschedule, please do so at least 24 hours in advance</li>
+                            </ul>
+                        </div>
+                        
+                        <p>If you have any questions or need to make changes to your appointment, please contact us.</p>
+                        
+                        <div class="footer">
+                            <p>Best regards,<br>The MediGo Team</p>
+                            <hr>
+                            <p><small>This is an automated confirmation email. Please save this for your records.</small></p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Appointment confirmation email sent:', info.messageId);
+        return info;
+    } catch (error) {
+        console.error('Failed to send appointment confirmation email:', error);
+        throw new ApiError(500, 'Failed to send appointment confirmation email');
+    }
+};
+
+/**
  * Send welcome email after successful verification
  * @param {string} email 
  * @param {string} firstName 

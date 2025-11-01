@@ -2,7 +2,11 @@ import {asyncHandler} from '../utils/asyncHandler.js';
 import {ApiResponse} from '../utils/apiResponse.js';
 import {ApiError} from '../utils/apiError.js';
 import Conversation from '../models/conversation.model.js';
+import Appointment from '../models/appointment.model.js';
+import Doctor from '../models/doctor.model.js';
+import User from '../models/user.model.js';
 import { v4 as uuidv4 } from 'uuid';
+import { sendAppointmentConfirmationEmail } from '../services/emailService.js';
 
 // Chat with AI Agent
 const chatWithAgent = asyncHandler(async (req, res) => {
@@ -77,7 +81,20 @@ const chatWithAgent = asyncHandler(async (req, res) => {
 
         // Update extracted data if provided
         if (agentResponse.extractedData) {
-            if (agentResponse.extractedData.symptoms) {
+            // Store agent-specific data in aiContext for workflow purposes
+            // but don't override schema-defined structure
+            if (!conversation.aiContext) {
+                conversation.aiContext = {};
+            }
+            
+            // Store raw agent data for workflow continuity
+            conversation.aiContext.agentData = {
+                ...conversation.aiContext.agentData,
+                ...agentResponse.extractedData
+            };
+            
+            // Handle schema-compliant fields
+            if (agentResponse.extractedData.symptoms && typeof agentResponse.extractedData.symptoms === 'object') {
                 conversation.updateSymptoms(agentResponse.extractedData.symptoms);
             }
             if (agentResponse.extractedData.recommendation) {
@@ -86,22 +103,67 @@ const chatWithAgent = asyncHandler(async (req, res) => {
             if (agentResponse.extractedData.selectedDoctor) {
                 conversation.extractedData.selectedDoctor = agentResponse.extractedData.selectedDoctor;
             }
-            if (agentResponse.extractedData.selectedSlot) {
+            if (agentResponse.extractedData.selectedSlot && typeof agentResponse.extractedData.selectedSlot === 'object') {
                 conversation.extractedData.selectedSlot = agentResponse.extractedData.selectedSlot;
             }
         }
 
         // Update AI context
         if (agentResponse.aiContext) {
+            // Preserve agentData when merging aiContext
+            const existingAgentData = conversation.aiContext?.agentData || {};
             conversation.aiContext = {
                 ...conversation.aiContext,
-                ...agentResponse.aiContext
+                ...agentResponse.aiContext,
+                agentData: {
+                    ...existingAgentData,
+                    ...(agentResponse.aiContext.agentData || {})
+                }
             };
         }
 
-        // If appointment was created, update conversation
+        // If appointment was created, update conversation and send confirmation email
         if (agentResponse.appointmentId) {
             conversation.complete(agentResponse.appointmentId);
+            
+            // Send appointment confirmation email
+            try {
+                // Fetch appointment details
+                const appointment = await Appointment.findById(agentResponse.appointmentId)
+                    .populate('doctor', 'name specialization hospital consultationFee')
+                    .populate('patient', 'firstName email');
+                
+                if (appointment && appointment.patient && appointment.doctor) {
+                    const appointmentDate = new Date(appointment.appointmentDate);
+                    const formattedDate = appointmentDate.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                    
+                    const formattedTime = `${appointment.timeSlot.startTime} - ${appointment.timeSlot.endTime}`;
+                    
+                    await sendAppointmentConfirmationEmail(
+                        appointment.patient.email,
+                        appointment.patient.firstName,
+                        {
+                            appointmentId: appointment._id.toString(),
+                            doctorName: appointment.doctor.name,
+                            specialization: appointment.doctor.specialization,
+                            date: formattedDate,
+                            time: formattedTime,
+                            hospital: appointment.doctor.hospital,
+                            consultationFee: appointment.doctor.consultationFee || 0
+                        }
+                    );
+                    
+                    console.log(`Appointment confirmation email sent to ${appointment.patient.email}`);
+                }
+            } catch (emailError) {
+                console.error('Error sending appointment confirmation email:', emailError);
+                // Don't fail the request if email fails
+            }
         }
 
         await conversation.save();
