@@ -19,9 +19,10 @@ export const login = (credentials) => api.post('/users/login', credentials);
 export const logout = () => api.post('/users/logout');
 export const getProfile = () => api.get('/users/profile');
 export const updateProfile = (profileData) => api.put('/users/profile', profileData);
-export const verifyEmail = (token) => api.post('/users/verify-email', { token });
+export const verifyEmail = (otp) => api.post('/users/verify-email', { otp });
 export const verifyPhone = (token) => api.post('/users/verify-phone', { token });
 export const sendUserChat = (message) => api.post('/message', { message });
+export const sendEmailVerificationOTP = () => api.post('/users/resend-email-otp');
 
 export default api;
 

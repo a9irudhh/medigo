@@ -1,18 +1,20 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import useAuthStore from "../store/authStore";
-import { getProfile, logout as logoutUser } from "../services/api";
+import { getProfile, logout as logoutUser, sendEmailVerificationOTP } from "../services/api";
 import Spinner from "../components/Spinner";
 import Header from "../components/Header";
 
 const ProfilePage = () => {
   const { user, setUser, logout } = useAuthStore();
   const navigate = useNavigate();
+  // const [reload, setReload] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         const { data } = await getProfile();
+        console.log("Profile data:", data);
         setUser(data.data.user);
       } catch (error) {
         console.error("Failed to fetch profile:", error);
@@ -23,6 +25,8 @@ const ProfilePage = () => {
     }
   }, [user, setUser]);
 
+  
+
   const handleLogout = async () => {
     await logoutUser();
     logout();
@@ -30,6 +34,7 @@ const ProfilePage = () => {
   };
 
   const verifyEmail = () => {
+    sendEmailVerificationOTP();
     navigate('/verify-email');
   }
 
@@ -60,7 +65,7 @@ const ProfilePage = () => {
             <div>
               <p>
                 <span className="font-semibold">Email:</span> {user.email}
-              <span onClick={!user.isEmailVerified && verifyEmail}
+              <span onClick={user.isEmailVerified ? null : verifyEmail}
                 className={`text-sm px-2 py-1 rounded-full ml-2 ${
                   user.isEmailVerified
                     ? "bg-green-100 text-green-700"

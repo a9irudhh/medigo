@@ -4,7 +4,7 @@ import { verifyEmail } from '../services/api';
 import Header from '../components/Header';
 
 const VerifyEmailPage = () => {
-  const [token, setToken] = useState('');
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -14,13 +14,15 @@ const VerifyEmailPage = () => {
     setLoading(true);
     setError('');
     setMessage('');
+    console.log('Submitting token:', otp);
     try {
-      await verifyEmail(token);
+      await verifyEmail(otp);
       setMessage('Your email has been successfully verified!');
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid or expired token.');
     } finally {
       setLoading(false);
+      Navigate('/profile');
     }
   };
 
@@ -33,11 +35,11 @@ const VerifyEmailPage = () => {
         <p className="text-center text-gray-600">Enter the 6-digit code sent to your email address.</p>
         <form onSubmit={handleSubmit} className="space-y-6">
           <input
-            name="token"
+            name="otp"
             type="text"
             placeholder="Verification Code"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
             required
             />
