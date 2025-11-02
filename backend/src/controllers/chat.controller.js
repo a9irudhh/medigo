@@ -12,7 +12,7 @@ import { sendAppointmentConfirmationEmail } from '../services/emailService.js';
 const chatWithAgent = asyncHandler(async (req, res) => {
     const { message, conversationId } = req.body;
     const userId = req.user._id;
-
+    
     if (!message || message.trim().length === 0) {
         throw new ApiError(400, 'Message is required');
     }
