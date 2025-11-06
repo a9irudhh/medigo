@@ -6,7 +6,6 @@ import Header from '../components/Header';
 import { sendUserChat, startConversationReq } from '../services/api';
 
 const ChatPage = () => {
-  // --- State Management ---
   const [messages, setMessages] = useState([]);
   // const [messages, setMessages] = useState([
   //   {
@@ -68,38 +67,6 @@ const ChatPage = () => {
     inputRef.current?.focus();
   }, []);
 
-
-  // --- Event Handlers ---
-  // const handleSend = () => {
-  //   if (!input.trim() || loading) return;
-
-  //   // sendUserChat
-  //   const userMsg = { sender: 'user', text: input };
-  //   setMessages(prev => [...prev, userMsg]);
-  //   setInput('');
-  //   setLoading(true);
-
-  //   // Simulate bot response with a delay
-  //   setTimeout(() => {
-  //     // A mock response that seems more contextual
-
-  //     const botResponse = 
-  //     `Thank you for your message about: "${userMsg.text}". Please remember, I am an AI assistant and not a medical professional. For any health concerns, it is crucial to consult with a qualified doctor.`;
-      
-  //     setMessages(prev => [
-  //       ...prev,
-  //       {
-  //         sender: 'bot',
-  //         text: botResponse,
-  //       },
-  //     ]);
-  //     setLoading(false);
-  //     // Re-focus the input after the bot responds
-  //     setTimeout(() => inputRef.current?.focus(), 100);
-  //   }, 1500);
-
-  // };
-
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     setInput('');
@@ -109,27 +76,30 @@ const ChatPage = () => {
     setMessages(prev => [...prev, { sender: 'bot', text: serverResponse.data.data.message }]);
     setConversationId(serverResponse.data.data.conversationId);
     console.log("Server response:", serverResponse.data.data.conversationId);
-    // const botReply = serverResponse.data.data.reply;
   }
 
 
 
   const handleInputKeyDown = (e) => {
     if (e.key === 'Enter') {
-      e.preventDefault(); // Prevent new line on enter
+      e.preventDefault(); 
       handleSend();
     }
   };
 
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
 
   // --- Render ---
   return (
-    <div className="flex flex-col h-screen bg-gray-50 font-sans">
+    <div className="flex flex-col h-screen bg-gray-50 font-sans bg-gradient-to-b from-teal-50 to-white">
       <Header />
 
       {/* Chat Messages */}
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="max-w-[60%] mx-auto space-y-8">
+        <div className="max-w-[80%] mx-auto space-y-8">
           {messages.map((msg, idx) => (
             <div
               key={idx}
@@ -145,11 +115,11 @@ const ChatPage = () => {
               )}
 
               {/* Message Bubble */}
-              <div
+              <div ref={chatEndRef}
                 className={`max-w-[60%] p-4 rounded-2xl shadow-sm ${
                   msg.sender === 'user'
-                    ? 'bg-blue-600 text-white rounded-br-none'
-                    : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'
+                    ? 'bg-blue-100 text-blue-500 rounded-br-none'
+                    : 'bg-teal-100 text-teal-600 rounded-bl-none border border-gray-100'
                 }`}
               >
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
