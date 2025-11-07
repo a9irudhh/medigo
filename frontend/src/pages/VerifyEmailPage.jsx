@@ -18,10 +18,13 @@ const VerifyEmailPage = () => {
     try {
       await verifyEmail(otp);
       setMessage('Your email has been successfully verified!');
+      alert("Email verified successfully!");
+      Navigate('/profile');
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid or expired token.');
     } finally {
       setLoading(false);
+      alert("Email verification Failed!");
       Navigate('/profile');
     }
   };

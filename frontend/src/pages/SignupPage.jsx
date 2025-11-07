@@ -42,7 +42,7 @@ const SignupPage = () => {
     try {
       const { data } = await signup(formData);
       authLogin(data.data.user, data.data.token);
-      navigate('/profile');
+      navigate('/verify-email');
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed. Please check your details and try again.');
     } finally {
@@ -54,7 +54,7 @@ const SignupPage = () => {
   const formLabelClass = "block text-sm font-medium text-gray-700 mb-1";
 
   return (
-    <div className="flex items-center justify-center min-h-screen py-12 bg-gray-50">
+    <div className="flex items-center justify-center min-h-screen py-12 bg-gradient-to-b from-teal-100 to teal-50">
       <div className="w-full max-w-3xl p-8 space-y-8 bg-white rounded-lg shadow-xl">
         <div>
             <h2 className="text-3xl font-extrabold text-center text-gray-900">

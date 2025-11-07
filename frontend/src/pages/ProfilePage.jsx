@@ -8,7 +8,6 @@ import Header from "../components/Header";
 const ProfilePage = () => {
   const { user, setUser, logout } = useAuthStore();
   const navigate = useNavigate();
-  // const [reload, setReload] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -24,6 +23,7 @@ const ProfilePage = () => {
       fetchProfile();
     }
   }, [user, setUser]);
+  // }, []);
 
   
 
@@ -85,7 +85,7 @@ const ProfilePage = () => {
               </p>
             </div>
             <p><span className="font-semibold">Date of Birth:</span> {new Date(user.dateOfBirth).toLocaleDateString()}</p>
-            <p><span className="font-semibold">Gender:</span> {user.gender}</p>
+            <p><span className="font-semibold">Gender:</span> {user.gender[0].toUpperCase() + user.gender.substring(1)}</p>
             <p><span className="font-semibold">Blood Group:</span> {user.bloodGroup || "Not set"}</p>
           </div>
 
