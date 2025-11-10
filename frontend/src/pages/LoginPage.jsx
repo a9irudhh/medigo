@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../services/api';
 import useAuthStore from '../store/authStore';
+import Footer from '../components/Footer';
 
 const LoginPage = () => {
   const [identifier, setIdentifier] = useState('');
@@ -91,6 +92,7 @@ const LoginPage = () => {
           </Link>
         </p>
       </div>
+      <Footer />
     </div>
   );
 };

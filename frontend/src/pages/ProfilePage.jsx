@@ -4,8 +4,10 @@ import useAuthStore from "../store/authStore";
 import { getProfile, logout as logoutUser, sendEmailVerificationOTP } from "../services/api";
 import Spinner from "../components/Spinner";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 
 const ProfilePage = () => {
+  const [reload, setReload] = useState(false);
   const { user, setUser, logout } = useAuthStore();
   const navigate = useNavigate();
 
@@ -22,7 +24,7 @@ const ProfilePage = () => {
     if (!user) {
       fetchProfile();
     }
-  }, [user, setUser]);
+  }, [user, setUser, reload]);
   // }, []);
 
   
@@ -33,7 +35,7 @@ const ProfilePage = () => {
     navigate("/login");
   };
 
-  const verifyEmail = () => {
+  const verifyEmail = (setReload) => {
     sendEmailVerificationOTP();
     navigate('/verify-email');
   }
@@ -121,6 +123,7 @@ const ProfilePage = () => {
             </button>
           </div>
         </div>
+      {/* <Footer /> */}
       </div>
     </>
   );

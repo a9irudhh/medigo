@@ -1,4 +1,5 @@
 import Header from "../components/Header"
+import Footer from "../components/Footer";
 import { useNavigate } from "react-router-dom"
 import PlusIcon from "../icons/PlusIcon";
 
@@ -22,6 +23,7 @@ const HomePage = () => {
                 ><PlusIcon /> New Chat</button>
                 <p className="pt-5 text-center text-gray-500">Click on the <strong>New Chat</strong> button to interact with the <br/> <strong>Medigo Agent</strong> and Book an appointment with the Doctor</p>
             </div>
+            <Footer />
         </>
     )
 }
