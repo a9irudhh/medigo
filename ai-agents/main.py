@@ -17,6 +17,7 @@ from utils.gemini_client import GeminiClient
 # Load environment variables
 load_dotenv()
 
+print("GEMINI_API_KEY:", os.getenv("GEMINI_API_KEY"))
 # Configure logging
 logger.remove()
 logger.add(sys.stderr, level="INFO", format="{time} - {level} - {message}")

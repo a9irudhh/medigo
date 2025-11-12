@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../services/api';
 import useAuthStore from '../store/authStore';
+import Footer from '../components/Footer';
 
 const LoginPage = () => {
   const [identifier, setIdentifier] = useState('');
@@ -17,6 +18,7 @@ const LoginPage = () => {
     setError('');
     try {
       const { data } = await login({ identifier, password });
+      console.log('Login response data:', data);
       authLogin(data.data.user, data.data.token);
       navigate('/home');
     } catch (err) {
@@ -91,6 +93,7 @@ const LoginPage = () => {
           </Link>
         </p>
       </div>
+      <Footer />
     </div>
   );
 };

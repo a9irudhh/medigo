@@ -18,7 +18,7 @@ class GeminiClient:
         genai.configure(api_key=self.api_key)
         
         # Initialize the model
-        self.model_name = "gemini-2.0-flash-exp"
+        self.model_name = "gemini-2.0-flash"
         try:
             self.model = genai.GenerativeModel(self.model_name)
             self._available = True
