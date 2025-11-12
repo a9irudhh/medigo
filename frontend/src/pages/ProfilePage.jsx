@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import useAuthStore from "../store/authStore";
 import { getProfile, logout as logoutUser, sendEmailVerificationOTP } from "../services/api";
 import Spinner from "../components/Spinner";
@@ -10,6 +10,7 @@ const ProfilePage = () => {
   const [reload, setReload] = useState(false);
   const { user, setUser, logout } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -21,13 +22,13 @@ const ProfilePage = () => {
         console.error("Failed to fetch profile:", error);
       }
     };
-    if (!user) {
+    if (!user || location.state?.fromVerification || reload) {
       fetchProfile();
     }
-  }, [user, setUser, reload]);
-  // }, []);
+    }, []);
+  // }, [user, setUser, reload, location.state]);
 
-  
+  // fetchProfile();
 
   const handleLogout = async () => {
     await logoutUser();

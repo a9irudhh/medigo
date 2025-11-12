@@ -18,6 +18,7 @@ const LoginPage = () => {
     setError('');
     try {
       const { data } = await login({ identifier, password });
+      console.log('Login response data:', data);
       authLogin(data.data.user, data.data.token);
       navigate('/home');
     } catch (err) {

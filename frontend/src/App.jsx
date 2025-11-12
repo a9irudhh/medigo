@@ -21,15 +21,15 @@ function App() {
           <Route path="/" element={<Navigate to="/login" />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
-          <Route path="/home" element={<HomePage />} />
+          <Route path="/home" element={<PrivateRoute><HomePage /></PrivateRoute>} />
           {/* <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
           <Route path="/update-profile" element={<PrivateRoute><UpdateProfilePage /></PrivateRoute>} />
           <Route path="/verify-email" element={<PrivateRoute><VerifyEmailPage /></PrivateRoute>} />
           <Route path="/verify-phone" element={<PrivateRoute><VerifyPhonePage /></PrivateRoute>} /> */}
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/update-profile" element={<UpdateProfilePage />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+          <Route path="/update-profile" element={<PrivateRoute><UpdateProfilePage /></PrivateRoute>} />
+          <Route path="/verify-email" element={<PrivateRoute><VerifyEmailPage /></PrivateRoute>} />
+          <Route path="/chat" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
         </Routes>
       </div>
     </Router>

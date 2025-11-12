@@ -4,7 +4,9 @@ import Spinner from '../components/Spinner';
 import { verifyEmail } from '../services/api';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { sendEmailVerificationOTP } from '../services/api';
+import { getProfile, sendEmailVerificationOTP } from '../services/api';
+import useAuthStore from '../store/authStore';
+// import { set } from 'mongoose';
 
 const VerifyEmailPage = ( {setReload} ) => {
   const navigate = useNavigate();
@@ -12,6 +14,7 @@ const VerifyEmailPage = ( {setReload} ) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const { user, setUser } = useAuthStore();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,15 +25,20 @@ const VerifyEmailPage = ( {setReload} ) => {
     try {
       await verifyEmail(otp);
       setMessage('Your email has been successfully verified!');
-      alert("Email verified successfully!");
-      setReload(prev => !prev);
-      navigate('/profile');
+      
+      
+      const { data } = await getProfile();
+      setUser(data.data.user);
+      console.log("Updated user data after verification:", data.data.user); 
+      setTimeout(() => {
+        navigate('/profile', {state: {fromVerification: true}} );
+      }, 1000);
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid or expired token.');
     } finally {
       setLoading(false);
       // alert("Email verification Failed!");
-      navigate('/profile');
+      navigate('/profile', { state: {fromVerification: false}});
     }
   };
 
@@ -39,9 +47,15 @@ const VerifyEmailPage = ( {setReload} ) => {
     setLoading(true);
     setError('');
     setMessage('');
-    await sendEmailVerificationOTP();
-    setLoading(false);
-  }
+    try {
+      await sendEmailVerificationOTP();
+      setMessage('A new OTP has been sent to your email address.');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to resend OTP. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
