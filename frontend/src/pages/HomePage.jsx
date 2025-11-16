@@ -9,10 +9,10 @@ const HomePage = () => {
         navigate('/chat');
     }
     return (
-        <>
+        <div className="flex flex-col min-h-screen">
             <Header />
             <div
-            className="flex flex-col items-center justify-center h-[calc(100vh-300px)] pt-10
+            className="flex flex-grow flex-col items-center justify-center h-[calc(100vh-300px)] pt-10
                  bg-gradient-to-b from-teal-50 to-white">
                 <button 
                 onClick={handleClick}
@@ -24,7 +24,7 @@ const HomePage = () => {
                 <p className="pt-5 text-center text-gray-500">Click on the <strong>New Chat</strong> button to interact with the <br/> <strong>Medigo Agent</strong> and Book an appointment with the Doctor</p>
             </div>
             <Footer />
-        </>
+        </div>
     )
 }
 

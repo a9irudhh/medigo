@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signup } from '../services/api';
 import useAuthStore from '../store/authStore';
+import Footer from '../components/Footer';
 
 const SignupPage = () => {
   const [formData, setFormData] = useState({
@@ -54,8 +55,8 @@ const SignupPage = () => {
   const formLabelClass = "block text-sm font-medium text-gray-700 mb-1";
 
   return (
-    <div className="flex items-center justify-center min-h-screen py-12 bg-gradient-to-b from-teal-100 to teal-50">
-      <div className="w-full max-w-3xl p-8 space-y-8 bg-white rounded-lg shadow-xl">
+    <div className="flex flex-col items-center justify-center min-h-screen pt-12 bg-gradient-to-b from-teal-100 to teal-50">
+      <div className="w-full max-w-xl p-8 space-y-8 bg-white rounded-lg shadow-xl pb-16">
         <div>
             <h2 className="text-3xl font-extrabold text-center text-gray-900">
                 Create Your MediGo Account
@@ -65,8 +66,8 @@ const SignupPage = () => {
             </p>
         </div>
         
-        <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="space-y-6 px-6 mb-2">
+            <div className="grid grid-cols-1 gap-6">
                  <div>
                     <label htmlFor="firstName" className={formLabelClass}>First Name</label>
                     <input id="firstName" name="firstName" type="text" value={formData.firstName} onChange={handleChange} required className={formInputClass} />
@@ -128,7 +129,7 @@ const SignupPage = () => {
                  <button
                     type="submit"
                     disabled={loading}
-                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-blue-500 hover:text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:bg-gray-400"
+                    className="w-full flex justify-center mt-10 py-2 px-4 border rounded-md shadow-sm text-sm font-medium text-blue-500 hover:text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:bg-gray-400"
                     >
                     {loading ? 'Creating Account...' : 'Sign Up'}
                 </button>
@@ -142,6 +143,7 @@ const SignupPage = () => {
           </Link>
         </p>
       </div>
+      <Footer/>
     </div>
   );
 };

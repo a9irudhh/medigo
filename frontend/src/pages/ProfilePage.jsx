@@ -50,13 +50,13 @@ const ProfilePage = () => {
   }
 
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <Header />
-      <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-teal-50 to-white py-10 px-4">
-        <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-2xl p-8 md:p-10 border border-gray-100">
+      <div className="flex flex-grow flex-col items-center justify-center bg-gradient-to-b from-teal-100/50 to-white px-4">
+        <div className="max-w-4xl mx-auto ">
           {/* Profile Header */}
           <div className="text-center mb-8">
-            <div className="w-24 h-24 mx-auto rounded-full bg-teal-100 flex items-center justify-center text-4xl font-semibold text-teal-700">
+            <div className="w-24 h-24 mx-auto rounded-full bg-teal-200 flex items-center justify-center text-4xl font-semibold text-teal-700">
               {user.fullName?.charAt(0)}
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mt-4">{user.fullName}</h1>
@@ -64,7 +64,7 @@ const ProfilePage = () => {
           </div>
 
           {/* Profile Info */}
-          <div className="grid md:grid-cols-2 gap-6 text-gray-700">
+          <div className="grid md:grid-cols-[2fr_1fr] gap-6 text-gray-700">
             <div>
               <p>
                 <span className="font-semibold">Email:</span> {user.email}
@@ -93,7 +93,7 @@ const ProfilePage = () => {
           </div>
 
           {/* Address Section */}
-          <div className="mt-8 border-t pt-6">
+          <div className="mt-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Address</h2>
             {user.address ? (
               <div className="text-gray-700 leading-relaxed">
@@ -118,15 +118,15 @@ const ProfilePage = () => {
             </Link>
             <button
               onClick={handleLogout}
-              className="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition"
+              className="px-6 py-2 border border-red-500 text-red-500 rounded-lg font-medium hover:bg-red-600 hover:text-white transition"
             >
               Logout
             </button>
           </div>
         </div>
-      {/* <Footer /> */}
       </div>
-    </>
+      <Footer />
+    </div>
   );
 };
 

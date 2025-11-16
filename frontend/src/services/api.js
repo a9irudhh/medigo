@@ -23,6 +23,8 @@ export const verifyEmail = (otp) => api.post('/users/verify-email', { otp });
 export const startConversationReq = () => api.post('/chat/message');
 export const sendUserChat = (message,conversationId) => api.post('/chat/message', { message, conversationId });
 export const sendEmailVerificationOTP = () => api.post('/users/resend-email-otp');
+export const forgotPassword = (email) => api.post('/users/forgot-password', { email });
+export const resetPassword = (email, otp, newPassword) => api.post('/users/reset-password', { otp, email, newPassword });
 
 export default api;
 
