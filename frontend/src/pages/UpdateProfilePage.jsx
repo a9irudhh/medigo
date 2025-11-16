@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 import { getProfile, updateProfile } from "../services/api";
 import useAuthStore from "../store/authStore";
 
@@ -80,9 +81,9 @@ const UpdateProfilePage = () => {
     );
 
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <Header />
-      <div className="bg-gray-100 min-h-[90vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="bg-gray-100  flex-col flex flex-grow items-center justify-center bg-gradient-to-b from-teal-100 to-white py-12 px-4 sm:px-6 lg:px-8">
         <div className="w-full max-w-3xl p-8 space-y-8 bg-white rounded-2xl shadow-lg">
           <div className="text-center">
             <h2 className="text-3xl font-extrabold text-gray-900">
@@ -311,7 +312,8 @@ const UpdateProfilePage = () => {
           </form>
         </div>
       </div>
-    </>
+      <Footer />
+    </div>
   );
 };
 
