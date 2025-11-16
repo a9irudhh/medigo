@@ -52,8 +52,8 @@ const ProfilePage = () => {
   return (
     <>
       <Header />
-      <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-teal-50 to-white py-10 px-4">
-        <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-2xl p-8 md:p-10 border border-gray-100">
+      <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-teal-100 to-white pb-10 px-4">
+        <div className="max-w-4xl mx-auto p-8 md:p-10">
           {/* Profile Header */}
           <div className="text-center mb-8">
             <div className="w-24 h-24 mx-auto rounded-full bg-teal-100 flex items-center justify-center text-4xl font-semibold text-teal-700">
@@ -64,7 +64,7 @@ const ProfilePage = () => {
           </div>
 
           {/* Profile Info */}
-          <div className="grid md:grid-cols-2 gap-6 text-gray-700">
+          <div className="grid md:grid-cols-[2fr_1fr] gap-6 text-gray-700">
             <div>
               <p>
                 <span className="font-semibold">Email:</span> {user.email}
@@ -93,7 +93,7 @@ const ProfilePage = () => {
           </div>
 
           {/* Address Section */}
-          <div className="mt-8 border-t pt-6">
+          <div className="mt-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Address</h2>
             {user.address ? (
               <div className="text-gray-700 leading-relaxed">
