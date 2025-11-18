@@ -10,6 +10,7 @@ import ChatPage from './pages/ChatPage';
 import OtpVerificationPage from './pages/OtpVerificationPage';
 import NotFoundPage from './pages/NotFoundPage';
 import Footer from './components/Footer';
+import EnterEmailPage from './pages/EnterEmailPage';
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated } = useAuthStore();
@@ -24,6 +25,7 @@ function App() {
           <Route path="/" element={<Navigate to="/login" />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/email" element={<EnterEmailPage />} />
           <Route path="/home" element={<PrivateRoute><HomePage /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
           <Route path="/update-profile" element={<PrivateRoute><UpdateProfilePage /></PrivateRoute>} />

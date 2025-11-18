@@ -55,7 +55,7 @@ const OtpVerificationPage = () => {
 
     // call reset-password API here
     try {
-      await resetPassword(finalOtp, email, password);
+      await resetPassword(email, finalOtp, password);
       navigate('/login');
     } catch (err) {
       alert(err.response?.data?.message || 'Password reset failed. Please try again.');
@@ -66,8 +66,10 @@ const OtpVerificationPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-teal-100 to-white px-6">
-      <div className="bg-white shadow-lg rounded-lg p-8 max-w-md w-full text-center ">
 
+      <div className="flex flex-grow justify-center items-center">
+
+      <div className="bg-white shadow-lg rounded-lg p-8 max-w-md w-full text-center ">
         <h2 className="text-2xl font-bold text-gray-800">Verify OTP</h2>
         <p className="text-gray-600 mt-2">
           Enter the 6-digit OTP and set your new password.
@@ -77,13 +79,13 @@ const OtpVerificationPage = () => {
         <div className="flex justify-center gap-3 mt-6">
           {otp.map((digit, i) => (
             <input
-              key={i}
-              ref={(el) => (inputRefs.current[i] = el)}
-              type="text"
-              maxLength={1}
-              value={digit}
-              onChange={(e) => handleOtpChange(e.target.value, i)}
-              onKeyDown={(e) => handleOtpBackspace(e, i)}
+            key={i}
+            ref={(el) => (inputRefs.current[i] = el)}
+            type="text"
+            maxLength={1}
+            value={digit}
+            onChange={(e) => handleOtpChange(e.target.value, i)}
+            onKeyDown={(e) => handleOtpBackspace(e, i)}
               className="w-12 h-12 text-center border border-gray-300 rounded-md text-xl font-medium focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           ))}
@@ -100,7 +102,7 @@ const OtpVerificationPage = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
+            />
 
           <label className="block mt-4 mb-1 text-gray-700 font-medium">
             Confirm Password
@@ -118,11 +120,12 @@ const OtpVerificationPage = () => {
         <button
           onClick={handleVerify}
           className="mt-6 w-full py-2 bg-teal-600 text-white rounded-md font-medium hover:bg-teal-700 transition"
-        >
+          >
           Reset Password
         </button>
 
       </div>
+          </div>
       <Footer />
     </div>
   );
