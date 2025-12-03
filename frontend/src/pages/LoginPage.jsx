@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import VisibilityIcon  from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import {forgotPassword} from '../services/api';
+import FloatingIcons from '../components/FloatingIcons';
 
 const LoginPage = () => {
   const [identifier, setIdentifier] = useState('');
@@ -51,7 +52,7 @@ const LoginPage = () => {
 
   return (
     <div className='flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-teal-100 to teal-50'>
-
+      <FloatingIcons/>
     <div className="flex flex-grow items-center justify-center">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-xl">
         <div>
