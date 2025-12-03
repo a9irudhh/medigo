@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import VisibilityIcon  from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import {forgotPassword} from '../services/api';
+import FloatingIcons from '../components/FloatingIcons';
 
 const LoginPage = () => {
   const [identifier, setIdentifier] = useState('');
@@ -22,11 +23,11 @@ const LoginPage = () => {
       return;
     } else {
       try {
-        await forgotPassword(identifier);
+        // await forgotPassword(identifier);
         // alert("If the provided email/phone is registered, a password reset link/OTP has been sent.");
 
         // navigate to a dedicated forgot password page to enter the OTP
-        navigate('/reset-password', {state: {identifier}});
+        navigate('/email');
       } catch (err) {
         alert("Failed to initiate password reset. Please try again later.");
       }
@@ -51,8 +52,8 @@ const LoginPage = () => {
 
   return (
     <div className='flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-teal-100 to teal-50'>
-
-    <div className="flex flex-grow items-center justify-center  ">
+      <FloatingIcons/>
+    <div className="flex flex-grow items-center justify-center">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-xl">
         <div>
             <h2 className="text-3xl font-extrabold text-center text-gray-900">
