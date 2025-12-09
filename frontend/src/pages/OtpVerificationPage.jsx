@@ -65,9 +65,9 @@ const OtpVerificationPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-teal-100 to-white px-6">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-teal-100 to-white px-6">
 
-      <div className="flex flex-grow justify-center items-center">
+      <div className="flex flex-grow items-center justify-center">
 
       <div className="bg-white shadow-lg rounded-lg p-8 max-w-md w-full text-center ">
         <h2 className="text-2xl font-bold text-gray-800">Verify OTP</h2>
@@ -125,7 +125,7 @@ const OtpVerificationPage = () => {
         </button>
 
       </div>
-          </div>
+      </div>
       <Footer />
     </div>
   );
