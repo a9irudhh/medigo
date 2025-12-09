@@ -232,10 +232,12 @@ class EnhancedMedicalConsultationWorkflow:
             }
     
     def _extract_preferred_day_from_message(self, message: str) -> Optional[str]:
-        """Extract preferred day of the week from user message"""
+        """Extract preferred day of the week from user message (including short forms)"""
         message_lower = message.lower()
         
+        # Full day names and their short forms mapped to proper day names
         day_mapping = {
+            # Full names
             "monday": "Monday",
             "tuesday": "Tuesday", 
             "wednesday": "Wednesday",
@@ -243,12 +245,33 @@ class EnhancedMedicalConsultationWorkflow:
             "friday": "Friday",
             "saturday": "Saturday",
             "sunday": "Sunday",
+            # Short forms (3 letters)
+            "mon": "Monday",
+            "tue": "Tuesday",
+            "wed": "Wednesday",
+            "thu": "Thursday",
+            "fri": "Friday",
+            "sat": "Saturday",
+            "sun": "Sunday",
+            # Alternative short forms
+            "tues": "Tuesday",
+            "thur": "Thursday",
+            "thurs": "Thursday",
+            # Special keywords
             "tomorrow": None,  # Will be calculated dynamically
             "today": None,  # Will be calculated dynamically
         }
         
-        for keyword, day_name in day_mapping.items():
-            if keyword in message_lower:
+        # Check full names first, then short forms (to avoid false matches)
+        # Sort by length descending to match longer patterns first
+        sorted_keywords = sorted(day_mapping.keys(), key=len, reverse=True)
+        
+        for keyword in sorted_keywords:
+            # Use word boundary check to avoid partial matches (e.g., "sun" in "sunny")
+            import re
+            pattern = r'\b' + keyword + r'\b'
+            if re.search(pattern, message_lower):
+                day_name = day_mapping[keyword]
                 if keyword == "tomorrow":
                     tomorrow = datetime.now() + timedelta(days=1)
                     return tomorrow.strftime("%A")

@@ -20,7 +20,7 @@ export const logout = () => api.post('/users/logout');
 export const getProfile = () => api.get('/users/profile');
 export const updateProfile = (profileData) => api.put('/users/profile', profileData);
 export const verifyEmail = (otp) => api.post('/users/verify-email', { otp });
-export const startConversationReq = () => api.post('/chat/start');  // Use proper start endpoint
+export const startConversationReq = () => api.post('/chat/message');  // Use proper start endpoint
 export const sendUserChat = (message, conversationId) => api.post('/chat/message', { message, conversationId });
 export const sendEmailVerificationOTP = () => api.post('/users/resend-email-otp');
 export const forgotPassword = (email) => api.post('/users/forgot-password', { email });
