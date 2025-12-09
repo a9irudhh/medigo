@@ -149,10 +149,33 @@ class DatabaseManager:
             day_name = date.strftime("%A")
             day_availability = None
             
-            for avail in doctor.get("availability", []):
-                if avail.get("day") == day_name:
-                    day_availability = avail
-                    break
+            availability_list = doctor.get("availability", [])
+            
+            # Handle both formats:
+            # 1. Simple string array: ["Monday", "Wednesday", "Friday"]
+            # 2. Object array: [{"day": "Monday", "slots": [...]}]
+            
+            if availability_list and isinstance(availability_list[0], str):
+                # Simple string format - check if the day is in the list
+                if day_name in availability_list:
+                    # Generate default slots for this day
+                    day_availability = {
+                        "day": day_name,
+                        "slots": [
+                            {"startTime": "09:00", "endTime": "10:00"},
+                            {"startTime": "10:00", "endTime": "11:00"},
+                            {"startTime": "11:00", "endTime": "12:00"},
+                            {"startTime": "14:00", "endTime": "15:00"},
+                            {"startTime": "15:00", "endTime": "16:00"},
+                            {"startTime": "16:00", "endTime": "17:00"}
+                        ]
+                    }
+            else:
+                # Object format - find matching day
+                for avail in availability_list:
+                    if isinstance(avail, dict) and avail.get("day") == day_name:
+                        day_availability = avail
+                        break
             
             if not day_availability:
                 return []
@@ -169,8 +192,10 @@ class DatabaseManager:
             
             booked_slots = set()
             for appointment in booked_appointments:
-                slot_key = f"{appointment['timeSlot']['startTime']}-{appointment['timeSlot']['endTime']}"
-                booked_slots.add(slot_key)
+                time_slot = appointment.get('timeSlot', {})
+                if time_slot:
+                    slot_key = f"{time_slot.get('startTime', '')}-{time_slot.get('endTime', '')}"
+                    booked_slots.add(slot_key)
             
             # Filter available slots
             available_slots = []
@@ -186,6 +211,8 @@ class DatabaseManager:
             
         except Exception as e:
             logger.error(f"Error getting doctor availability: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
     
     async def create_appointment(self, appointment_data: Dict[str, Any]) -> Optional[str]:

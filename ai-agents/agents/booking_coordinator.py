@@ -58,16 +58,16 @@ class BookingCoordinatorAgent:
                     })
             
             if available_slots:
-                response_message = f"**Dr. {doctor['name']}** has the following available slots:\n\n"
+                response_message = f"Dr. {doctor['name']} has the following available slots:\n\n"
                 
                 for day_info in available_slots[:5]:  # Show max 5 days
-                    response_message += f"**{day_info['day_name']}, {day_info['date']}:**\n"
+                    response_message += f"{day_info['day_name']}, {day_info['date']}:\n"
                     
                     for slot in day_info['slots'][:4]:  # Show max 4 slots per day
-                        response_message += f"• {slot['startTime']} - {slot['endTime']}\n"
+                        response_message += f"- {slot['startTime']} - {slot['endTime']}\n"
                     
                     if len(day_info['slots']) > 4:
-                        response_message += f"• ... and {len(day_info['slots']) - 4} more slots\n"
+                        response_message += f"- ... and {len(day_info['slots']) - 4} more slots\n"
                     
                     response_message += "\n"
                 
@@ -291,13 +291,13 @@ class BookingCoordinatorAgent:
         end_time = self._format_time_12h(time_slot["endTime"])
         
         message = f"Perfect! Here are your appointment details:\n\n"
-        message += f"👨‍⚕️ Doctor: Dr. {doctor_name}\n"
-        message += f"🏥 Hospital: {hospital}\n"
-        message += f"📅 Date: {date_str}\n"
-        message += f"🕐 Time: {start_time} - {end_time}\n"
+        message += f"Doctor: Dr. {doctor_name}\n"
+        message += f"Hospital: {hospital}\n"
+        message += f"Date: {date_str}\n"
+        message += f"Time: {start_time} - {end_time}\n"
         
         if fee > 0:
-            message += f"💰 Consultation Fee: ₹{fee}\n"
+            message += f"Consultation Fee: Rs.{fee}\n"
         
         message += f"\nWould you like me to confirm and book this appointment for you?"
         
@@ -310,27 +310,27 @@ class BookingCoordinatorAgent:
     ) -> str:
         """Generate booking success message"""
         
-        message = "🎉 Great news! Your appointment has been successfully booked!\n\n"
-        message += f"📋 Appointment ID: {appointment_id}\n"
-        message += f"👨‍⚕️ Doctor: Dr. {appointment_data.get('doctorName', 'N/A')}\n"
-        message += f"🏥 Hospital: {appointment_data.get('hospital', 'N/A')}\n"
+        message = "Great news! Your appointment has been successfully booked!\n\n"
+        message += f"Appointment ID: {appointment_id}\n"
+        message += f"Doctor: Dr. {appointment_data.get('doctorName', 'N/A')}\n"
+        message += f"Hospital: {appointment_data.get('hospital', 'N/A')}\n"
         
         if isinstance(appointment_data["appointmentDate"], datetime):
             date_str = appointment_data["appointmentDate"].strftime("%A, %B %d, %Y")
         else:
             date_str = appointment_data["appointmentDate"]
         
-        message += f"📅 Date: {date_str}\n"
+        message += f"Date: {date_str}\n"
         
         start_time = self._format_time_12h(appointment_data["timeSlot"]["startTime"])
         end_time = self._format_time_12h(appointment_data["timeSlot"]["endTime"])
-        message += f"🕐 Time: {start_time} - {end_time}\n"
+        message += f"Time: {start_time} - {end_time}\n"
         
         if appointment_data.get("consultationFee", 0) > 0:
-            message += f"💰 Fee: ₹{appointment_data['consultationFee']}\n"
+            message += f"Fee: Rs.{appointment_data['consultationFee']}\n"
         
-        message += "\n📱 You will receive a confirmation message with all the details shortly."
-        message += "\n\n✅ Your appointment is confirmed. Is there anything else I can help you with?"
+        message += "\nYou will receive a confirmation message with all the details shortly."
+        message += "\n\nYour appointment is confirmed. Is there anything else I can help you with?"
         
         return message
     

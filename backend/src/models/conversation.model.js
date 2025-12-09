@@ -191,6 +191,11 @@ conversationSchema.methods.updateStatus = function(status, step = null) {
         this.currentStep = step;
     }
     
+    // Re-activate conversation if transitioning from completed to a new flow
+    if (status !== 'completed' && status !== 'cancelled') {
+        this.isActive = true;
+    }
+    
     // Update session timeout
     this.sessionTimeout = new Date(Date.now() + 30 * 60 * 1000);
 };

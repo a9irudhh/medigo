@@ -321,11 +321,11 @@ class DoctorMatcherAgent:
             
             # Generate response message
             if len(doctor_list) == 1:
-                message = f"I found a suitable doctor for your condition:\n\n**{doctor_list[0]['name']}** - {doctor_list[0]['specialization']}\n\nWould you like me to help you book an appointment?"
+                message = f"I found a suitable doctor for your condition:\n\n{doctor_list[0]['name']} - {doctor_list[0]['specialization']}\n\nWould you like me to help you book an appointment?"
             else:
                 message = f"I found {len(doctor_list)} doctors who can help with your condition:\n\n"
                 for i, doc in enumerate(doctor_list[:3], 1):  # Show top 3
-                    message += f"{i}. **{doc['name']}** - {doc['specialization']}\n"
+                    message += f"{i}. {doc['name']} - {doc['specialization']}\n"
                 message += "\nWhich doctor would you prefer, or would you like more information about any of them?"
             
             return {

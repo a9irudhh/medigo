@@ -21,10 +21,15 @@ const chatWithAgent = asyncHandler(async (req, res) => {
 
     // Find or create conversation
     if (conversationId) {
+        // For completed conversations, allow messages for closing remarks
+        // For active conversations, require isActive: true
         conversation = await Conversation.findOne({
             conversationId,
             user: userId,
-            isActive: true
+            $or: [
+                { isActive: true },
+                { status: 'completed' }  // Allow completed conversations to receive messages
+            ]
         });
 
         if (!conversation) {
@@ -80,31 +85,38 @@ const chatWithAgent = asyncHandler(async (req, res) => {
         }
 
         // Update extracted data if provided
-        if (agentResponse.extractedData) {
-            // Store agent-specific data in aiContext for workflow purposes
-            // but don't override schema-defined structure
-            if (!conversation.aiContext) {
-                conversation.aiContext = {};
-            }
-            
-            // Store raw agent data for workflow continuity
-            conversation.aiContext.agentData = {
-                ...conversation.aiContext.agentData,
-                ...agentResponse.extractedData
-            };
-            
-            // Handle schema-compliant fields
-            if (agentResponse.extractedData.symptoms && typeof agentResponse.extractedData.symptoms === 'object') {
-                conversation.updateSymptoms(agentResponse.extractedData.symptoms);
-            }
-            if (agentResponse.extractedData.recommendation) {
-                conversation.updateRecommendation(agentResponse.extractedData.recommendation);
-            }
-            if (agentResponse.extractedData.selectedDoctor) {
-                conversation.extractedData.selectedDoctor = agentResponse.extractedData.selectedDoctor;
-            }
-            if (agentResponse.extractedData.selectedSlot && typeof agentResponse.extractedData.selectedSlot === 'object') {
-                conversation.extractedData.selectedSlot = agentResponse.extractedData.selectedSlot;
+        if (agentResponse.extractedData !== undefined) {
+            if (agentResponse.extractedData === null) {
+                // Explicitly clear agentData when null is sent
+                if (conversation.aiContext) {
+                    conversation.aiContext.agentData = null;
+                }
+            } else {
+                // Store agent-specific data in aiContext for workflow purposes
+                // but don't override schema-defined structure
+                if (!conversation.aiContext) {
+                    conversation.aiContext = {};
+                }
+                
+                // Store raw agent data for workflow continuity
+                conversation.aiContext.agentData = {
+                    ...conversation.aiContext.agentData,
+                    ...agentResponse.extractedData
+                };
+                
+                // Handle schema-compliant fields
+                if (agentResponse.extractedData.symptoms && typeof agentResponse.extractedData.symptoms === 'object') {
+                    conversation.updateSymptoms(agentResponse.extractedData.symptoms);
+                }
+                if (agentResponse.extractedData.recommendation) {
+                    conversation.updateRecommendation(agentResponse.extractedData.recommendation);
+                }
+                if (agentResponse.extractedData.selectedDoctor) {
+                    conversation.extractedData.selectedDoctor = agentResponse.extractedData.selectedDoctor;
+                }
+                if (agentResponse.extractedData.selectedSlot && typeof agentResponse.extractedData.selectedSlot === 'object') {
+                    conversation.extractedData.selectedSlot = agentResponse.extractedData.selectedSlot;
+                }
             }
         }
 

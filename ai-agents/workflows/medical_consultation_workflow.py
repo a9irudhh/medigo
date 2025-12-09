@@ -67,7 +67,14 @@ class EnhancedMedicalConsultationWorkflow:
                 return await self._handle_doctor_confirmation(message, conversation_state, user_id, conversation_id)
             
             elif current_step == "completed":
-                return self._handle_completed(message)
+                result = self._handle_completed(message)
+                # If user provided health concerns directly, process them as symptoms
+                if result.get("processAsSymptoms"):
+                    symptom_result = await self._handle_symptom_collection(
+                        message, conversation_state, user_id, conversation_id
+                    )
+                    return symptom_result
+                return result
             
             else:
                 return self._handle_general_inquiry(message)
@@ -108,6 +115,29 @@ class EnhancedMedicalConsultationWorkflow:
         """
         
         try:
+            message_lower = message.lower().strip()
+            
+            # Check if user is giving a yes/no response instead of symptoms
+            # This happens when they're responding to "Would you like to describe symptoms again?"
+            if any(word in message_lower for word in ["yes", "yeah", "yep", "sure", "ok", "okay"]):
+                # They said yes to describing symptoms again, ask them to describe
+                return {
+                    "message": "Great! Please describe your symptoms or health concern in detail so I can find the right doctor for you.",
+                    "agentType": "system",
+                    "confidence": 0.9,
+                    "requiresInput": True,
+                    "newStep": "symptom_collection"
+                }
+            elif any(word in message_lower for word in ["no", "nope", "nah"]):
+                # They said no, ask what they want instead
+                return {
+                    "message": "I understand. What would you like to do? You can describe symptoms for a different concern, or if you'd like to end this conversation, just let me know.",
+                    "agentType": "system",
+                    "confidence": 0.8,
+                    "requiresInput": True,
+                    "newStep": "symptom_collection"
+                }
+            
             # Analyze symptoms with AI
             analysis_prompt = self._build_streamlined_symptom_prompt({"current_message": message})
             ai_response = await self.gemini_client.generate_response(analysis_prompt)
@@ -201,6 +231,45 @@ class EnhancedMedicalConsultationWorkflow:
                 "newStep": "symptom_collection"
             }
     
+    def _extract_preferred_day_from_message(self, message: str) -> Optional[str]:
+        """Extract preferred day of the week from user message"""
+        message_lower = message.lower()
+        
+        day_mapping = {
+            "monday": "Monday",
+            "tuesday": "Tuesday", 
+            "wednesday": "Wednesday",
+            "thursday": "Thursday",
+            "friday": "Friday",
+            "saturday": "Saturday",
+            "sunday": "Sunday",
+            "tomorrow": None,  # Will be calculated dynamically
+            "today": None,  # Will be calculated dynamically
+        }
+        
+        for keyword, day_name in day_mapping.items():
+            if keyword in message_lower:
+                if keyword == "tomorrow":
+                    tomorrow = datetime.now() + timedelta(days=1)
+                    return tomorrow.strftime("%A")
+                elif keyword == "today":
+                    return datetime.now().strftime("%A")
+                return day_name
+        
+        return None
+
+    def _find_slot_for_day(self, available_dates: List[Dict], preferred_day: str) -> Optional[Dict]:
+        """Find the first available slot for a specific day of the week"""
+        for date_info in available_dates:
+            if date_info.get("day_name") == preferred_day:
+                if date_info.get("slots"):
+                    return {
+                        "date": date_info["date"],
+                        "day_name": date_info["day_name"],
+                        "slot": date_info["slots"][0]
+                    }
+        return None
+
     async def _handle_doctor_confirmation(
         self,
         message: str,
@@ -209,7 +278,10 @@ class EnhancedMedicalConsultationWorkflow:
         conversation_id: str
     ) -> Dict[str, Any]:
         """
-        Handle yes/no confirmation. If yes, book immediately. If no, end conversation.
+        Simplified flow:
+        1. User says 'yes' -> Show available days
+        2. User picks a day -> Book on that day
+        3. User says 'no' -> Go back to symptom collection
         """
         
         try:
@@ -217,7 +289,7 @@ class EnhancedMedicalConsultationWorkflow:
             
             # Get doctor data from aiContext.agentData
             ai_context = conversation_state.get("aiContext", {})
-            agent_data = ai_context.get("agentData", {})
+            agent_data = ai_context.get("agentData", {}) or {}
             
             logger.info(f"=== DOCTOR CONFIRMATION ===")
             logger.info(f"User message: {message}")
@@ -227,165 +299,260 @@ class EnhancedMedicalConsultationWorkflow:
             doctor_name = agent_data.get("doctor_name")
             recommended_doctor = agent_data.get("recommended_doctor", {})
             symptoms = agent_data.get("symptoms", "Medical consultation")
+            available_days_list = agent_data.get("available_days", [])  # From slot_selection step
             
-            # Check if user said YES
-            if any(word in message_lower for word in ["yes", "yeah", "yep", "sure", "ok", "okay", "proceed", "book", "confirm"]):
+            # Extract if user mentioned a specific day
+            preferred_day = self._extract_preferred_day_from_message(message)
+            
+            # Check if user said NO
+            if any(word in message_lower for word in ["no", "nope", "nah", "cancel", "don't", "dont"]):
+                return {
+                    "message": "No problem! Would you like to describe your symptoms again to find another doctor?",
+                    "agentType": "system",
+                    "confidence": 0.9,
+                    "requiresInput": True,
+                    "newStatus": "gathering_symptoms",
+                    "newStep": "symptom_collection",
+                    "extractedData": None
+                }
+            
+            if not doctor_id:
+                logger.error("No doctor_id found in agentData")
+                return {
+                    "message": "I'm sorry, I lost track of the doctor selection. Could you describe your symptoms again?",
+                    "agentType": "system",
+                    "confidence": 0.5,
+                    "requiresInput": True,
+                    "newStep": "symptom_collection"
+                }
+            
+            # Get doctor availability
+            logger.info(f"Checking availability for doctor: {doctor_id}")
+            availability_result = await self.booking_coordinator.check_doctor_availability(
+                doctor_id=str(doctor_id),
+                days_ahead=14
+            )
+            
+            available_dates = availability_result.get("available_slots", [])
+            
+            if not available_dates:
+                return {
+                    "message": f"I'm sorry, Dr. {doctor_name} doesn't have any available slots in the next 2 weeks. Would you like to find another doctor?",
+                    "agentType": "booking_coordinator",
+                    "confidence": 0.8,
+                    "requiresInput": True,
+                    "newStep": "symptom_collection"
+                }
+            
+            # Get unique available days
+            available_days = list(set([d["day_name"] for d in available_dates]))
+            
+            # CASE 1: User mentioned a specific day - try to book it
+            if preferred_day:
+                logger.info(f"User requested day: {preferred_day}")
                 
-                if not doctor_id:
-                    logger.error("No doctor_id found in agentData")
+                # Check if the requested day is available
+                if preferred_day in available_days:
+                    # Find the slot for this day and book it
+                    day_slot = self._find_slot_for_day(available_dates, preferred_day)
+                    if day_slot:
+                        return await self._book_appointment(
+                            doctor_id=doctor_id,
+                            doctor_name=doctor_name,
+                            recommended_doctor=recommended_doctor,
+                            selected_slot={
+                                "date": day_slot["date"],
+                                "startTime": day_slot["slot"]["startTime"],
+                                "endTime": day_slot["slot"]["endTime"]
+                            },
+                            symptoms=symptoms,
+                            user_id=user_id,
+                            conversation_id=conversation_id
+                        )
+                else:
+                    # Requested day is not available
                     return {
-                        "message": "I'm sorry, I lost track of the doctor selection. Could you describe your symptoms again?",
-                        "agentType": "system",
-                        "confidence": 0.5,
-                        "requiresInput": True,
-                        "newStep": "symptom_collection"
-                    }
-                
-                # Get next available slot for this doctor
-                logger.info(f"Checking availability for doctor: {doctor_id}")
-                availability_result = await self.booking_coordinator.check_doctor_availability(
-                    doctor_id=str(doctor_id),
-                    days_ahead=7
-                )
-                
-                logger.info(f"Availability result: {availability_result}")
-                
-                # Extract available slots from the nested structure
-                available_dates = availability_result.get("available_slots", [])
-                
-                if not available_dates:
-                    return {
-                        "message": f"I'm sorry, Dr. {doctor_name} doesn't have available slots in the next week. Would you like to describe your symptoms again to find another doctor?",
+                        "message": f"Sorry, Dr. {doctor_name} is not available on {preferred_day}.\n\n"
+                                  f"Available days are: {', '.join(available_days)}\n\n"
+                                  f"Please pick one of these days.",
                         "agentType": "booking_coordinator",
                         "confidence": 0.8,
                         "requiresInput": True,
-                        "newStep": "symptom_collection"
-                    }
-                
-                # Get the FIRST available slot (earliest date, earliest time)
-                first_date = available_dates[0]
-                first_slot_of_day = first_date["slots"][0]
-                
-                selected_slot = {
-                    "date": first_date["date"],
-                    "startTime": first_slot_of_day["startTime"],
-                    "endTime": first_slot_of_day["endTime"]
-                }
-                
-                logger.info(f"Booking first available slot: {selected_slot}")
-                
-                # Book the appointment immediately
-                booking_result = await self.booking_coordinator.handle_slot_selection(
-                    doctor_id=str(doctor_id),
-                    selected_date=selected_slot["date"],
-                    selected_time_slot={
-                        "startTime": selected_slot["startTime"],
-                        "endTime": selected_slot["endTime"]
-                    },
-                    user_id=user_id,
-                    symptoms=symptoms,
-                    conversation_id=conversation_id
-                )
-                
-                if booking_result.get("slotUnavailable"):
-                    return {
-                        "message": booking_result["message"] + "\n\nWould you like to try again?",
-                        "agentType": "booking_coordinator",
-                        "confidence": 0.7,
-                        "requiresInput": True,
-                        "newStep": "symptom_collection"
-                    }
-                
-                # Confirm booking
-                appointment_data = booking_result.get("appointmentData")
-                
-                if appointment_data:
-                    confirmation_result = await self.booking_coordinator.confirm_booking(appointment_data)
-                    
-                    if confirmation_result.get("bookingSuccessful"):
-                        # Format confirmation message
-                        try:
-                            date_obj = datetime.fromisoformat(selected_slot.get("date", ""))
-                            date_str = date_obj.strftime("%A, %B %d, %Y")
-                        except:
-                            date_str = selected_slot.get("date", "")
-                        
-                        confirmation_message = (
-                            f"Appointment Confirmed!\n\n"
-                            f"Doctor: Dr. {doctor_name}\n"
-                            f"Specialization: {recommended_doctor.get('specialization', 'N/A')}\n"
-                            f"Date: {date_str}\n"
-                            f"Time: {selected_slot.get('startTime', '')} - {selected_slot.get('endTime', '')}\n"
-                            f"Hospital: {recommended_doctor.get('hospital', 'N/A')}\n"
-                            f"Consultation Fee: ₹{recommended_doctor.get('consultationFee', 0)}\n"
-                            f"Appointment ID: {confirmation_result.get('appointmentId', 'N/A')}\n\n"
-                            f"A confirmation email has been sent to your registered email address.\n\n"
-                            f"Important:\n"
-                            f"- Please arrive 15 minutes early\n"
-                            f"- Bring a valid ID and medical records if any\n\n"
-                            f"Thank you for using MediGo! Take care!"
-                        )
-                        
-                        return {
-                            "message": confirmation_message,
-                            "agentType": "booking_coordinator",
-                            "confidence": 1.0,
-                            "requiresInput": False,
-                            "newStatus": "completed",
-                            "newStep": "completed",
-                            "appointmentId": confirmation_result["appointmentId"]
+                        "newStep": "doctor_confirmation",
+                        "extractedData": {
+                            "symptoms": symptoms,
+                            "doctor_id": doctor_id,
+                            "doctor_name": doctor_name,
+                            "recommended_doctor": recommended_doctor,
+                            "available_days": available_days
                         }
-                
+                    }
+            
+            # CASE 2: User said 'yes' or similar - show available days
+            if any(word in message_lower for word in ["yes", "yeah", "yep", "sure", "ok", "okay", "proceed", "book", "confirm"]):
                 return {
-                    "message": "Your appointment has been booked! You should receive a confirmation email shortly.",
+                    "message": f"Great! Dr. {doctor_name} is available on the following days:\n\n"
+                              f"{', '.join(available_days)}\n\n"
+                              f"Which day would you like to book? (e.g., Monday, Tuesday)",
                     "agentType": "booking_coordinator",
                     "confidence": 0.9,
-                    "requiresInput": False,
-                    "newStatus": "completed",
-                    "newStep": "completed"
-                }
-            
-            # Check if user said NO
-            elif any(word in message_lower for word in ["no", "nope", "nah", "cancel", "don't", "dont"]):
-                return {
-                    "message": "No problem! If you need medical assistance in the future, feel free to start a new conversation. Take care!",
-                    "agentType": "system",
-                    "confidence": 1.0,
-                    "requiresInput": False,
-                    "newStatus": "completed",
-                    "newStep": "completed"
-                }
-            
-            # Unclear response
-            else:
-                return {
-                    "message": f"I didn't catch that. Would you like to book an appointment with Dr. {doctor_name}? Please reply 'yes' or 'no'.",
-                    "agentType": "doctor_matcher",
-                    "confidence": 0.6,
                     "requiresInput": True,
-                    "newStep": "doctor_confirmation"
+                    "newStep": "doctor_confirmation",
+                    "extractedData": {
+                        "symptoms": symptoms,
+                        "doctor_id": doctor_id,
+                        "doctor_name": doctor_name,
+                        "recommended_doctor": recommended_doctor,
+                        "available_days": available_days
+                    }
                 }
+            
+            # CASE 3: Unclear response
+            return {
+                "message": f"Would you like to book an appointment with Dr. {doctor_name}? Please reply 'yes' or 'no'.",
+                "agentType": "doctor_matcher",
+                "confidence": 0.6,
+                "requiresInput": True,
+                "newStep": "doctor_confirmation"
+            }
             
         except Exception as e:
             logger.error(f"Error in doctor confirmation: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return {
-                "message": "I'm having trouble processing your response. Please reply 'yes' to book or 'no' to cancel.",
+                "message": "I'm having trouble processing your response. Please try again.",
                 "agentType": "system",
                 "confidence": 0.5,
                 "requiresInput": True,
                 "newStep": "doctor_confirmation"
             }
-    
+
+    async def _book_appointment(
+        self,
+        doctor_id: str,
+        doctor_name: str,
+        recommended_doctor: Dict,
+        selected_slot: Dict,
+        symptoms: str,
+        user_id: str,
+        conversation_id: str
+    ) -> Dict[str, Any]:
+        """Book the appointment and return confirmation message"""
+        
+        logger.info(f"Booking appointment: {selected_slot}")
+        
+        booking_result = await self.booking_coordinator.handle_slot_selection(
+            doctor_id=str(doctor_id),
+            selected_date=selected_slot["date"],
+            selected_time_slot={
+                "startTime": selected_slot["startTime"],
+                "endTime": selected_slot["endTime"]
+            },
+            user_id=user_id,
+            symptoms=symptoms,
+            conversation_id=conversation_id
+        )
+        
+        if booking_result.get("slotUnavailable"):
+            return {
+                "message": booking_result["message"] + "\n\nWould you like to try another day?",
+                "agentType": "booking_coordinator",
+                "confidence": 0.7,
+                "requiresInput": True,
+                "newStep": "doctor_confirmation"
+            }
+        
+        # Confirm booking
+        appointment_data = booking_result.get("appointmentData")
+        
+        if appointment_data:
+            confirmation_result = await self.booking_coordinator.confirm_booking(appointment_data)
+            
+            if confirmation_result.get("bookingSuccessful"):
+                try:
+                    date_obj = datetime.fromisoformat(selected_slot.get("date", ""))
+                    date_str = date_obj.strftime("%A, %B %d, %Y")
+                except:
+                    date_str = selected_slot.get("date", "")
+                
+                confirmation_message = (
+                    f"Appointment Confirmed!\n\n"
+                    f"Doctor: Dr. {doctor_name}\n"
+                    f"Specialization: {recommended_doctor.get('specialization', 'N/A')}\n"
+                    f"Date: {date_str}\n"
+                    f"Time: {selected_slot.get('startTime', '')} - {selected_slot.get('endTime', '')}\n"
+                    f"Hospital: {recommended_doctor.get('hospital', 'N/A')}\n"
+                    f"Consultation Fee: Rs.{recommended_doctor.get('consultationFee', 0)}\n"
+                    f"Appointment ID: {confirmation_result.get('appointmentId', 'N/A')}\n\n"
+                    f"A confirmation email has been sent to your registered email address.\n\n"
+                    f"Important:\n"
+                    f"- Please arrive 15 minutes early\n"
+                    f"- Bring a valid ID and medical records if any\n\n"
+                    f"Thank you for using MediGo! Take care!"
+                )
+                
+                return {
+                    "message": confirmation_message,
+                    "agentType": "booking_coordinator",
+                    "confidence": 1.0,
+                    "requiresInput": False,
+                    "newStatus": "completed",
+                    "newStep": "completed",
+                    "appointmentId": confirmation_result["appointmentId"]
+                }
+        
+        return {
+            "message": "Your appointment has been booked! You should receive a confirmation email shortly.",
+            "agentType": "booking_coordinator",
+            "confidence": 0.9,
+            "requiresInput": False,
+            "newStatus": "completed",
+            "newStep": "completed"
+        }
     
     def _handle_completed(self, message: str) -> Dict[str, Any]:
         """Handle messages after appointment is completed"""
+        message_lower = message.lower().strip()
+        
+        # Check if user is describing symptoms or health concerns directly
+        # (e.g., "I have headache", "eye checkup", "skin problem")
+        health_keywords = [
+            "headache", "pain", "fever", "cold", "cough", "eye", "skin", "stomach",
+            "heart", "chest", "back", "knee", "throat", "ear", "nose", "tooth",
+            "checkup", "check up", "consultation", "problem", "issue", "symptom",
+            "blurry", "vision", "rash", "allergy", "breathing", "dizzy", "nausea"
+        ]
+        
+        has_health_concern = any(keyword in message_lower for keyword in health_keywords)
+        wants_new_booking = any(word in message_lower for word in ["yes", "another", "more", "again", "different", "book", "appointment", "new"])
+        
+        if has_health_concern:
+            # User directly mentioned a health concern - process as symptoms immediately
+            return {
+                "processAsSymptoms": True,  # Flag to process message as symptoms
+                "newStatus": "gathering_symptoms",
+                "newStep": "symptom_collection",
+                "extractedData": None
+            }
+        
+        if wants_new_booking:
+            return {
+                "message": "Sure! Please describe your symptoms or health concern.",
+                "agentType": "system",
+                "confidence": 0.9,
+                "requiresInput": True,
+                "newStatus": "gathering_symptoms",
+                "newStep": "symptom_collection",
+                "extractedData": None
+            }
+        
+        # Otherwise, thank them and remain in completed state
         return {
-            "message": "Your appointment has been confirmed! If you need to make another appointment or have questions, please start a new conversation.",
+            "message": "Thank you for using MediGo! If you need to book another appointment in the future, just let me know your symptoms. Take care!",
             "agentType": "system",
             "confidence": 1.0,
-            "requiresInput": False,
+            "requiresInput": True,
             "newStep": "completed"
         }
     
@@ -536,12 +703,12 @@ Only mark as "urgent" if life-threatening (chest pain, severe bleeding, difficul
         message += f"I found {len(doctors)} available doctors:\n\n"
         
         for i, doc in enumerate(doctors, 1):
-            message += f"{i}. **Dr. {doc['name']}**\n"
-            message += f"   • Experience: {doc['experience']} years | Rating: {doc['rating']}/5\n"
-            message += f"   • Hospital: {doc['hospital']}\n"
-            message += f"   • Fee: ${doc['consultationFee']}\n\n"
+            message += f"{i}. Dr. {doc['name']}\n"
+            message += f"   - Experience: {doc['experience']} years | Rating: {doc['rating']}/5\n"
+            message += f"   - Hospital: {doc['hospital']}\n"
+            message += f"   - Fee: Rs.{doc['consultationFee']}\n\n"
         
-        message += "Please choose a doctor by number (e.g., '1', '2') or by name."
+        message += "Please choose a doctor by number (e.g., 1, 2) or by name."
         
         return message
     
@@ -589,7 +756,7 @@ Only mark as "urgent" if life-threatening (chest pain, severe bleeding, difficul
             except:
                 date_str = date
             
-            message += f"**{date_str}**\n"
+            message += f"{date_str}\n"
             for slot in date_slots:
                 start_time = slot.get("startTime", "")
                 end_time = slot.get("endTime", "")
@@ -597,7 +764,7 @@ Only mark as "urgent" if life-threatening (chest pain, severe bleeding, difficul
                 slot_index += 1
             message += "\n"
         
-        message += "Please choose a time slot by number (e.g., '1', '2')."
+        message += "Please choose a time slot by number (e.g., 1, 2)."
         
         return message
     
@@ -639,20 +806,20 @@ Only mark as "urgent" if life-threatening (chest pain, severe bleeding, difficul
         except:
             date_str = slot.get("date", "")
         
-        message = "✅ **Appointment Confirmed!**\n\n"
-        message += f"**Doctor:** Dr. {doctor['name']}\n"
-        message += f"**Specialization:** {doctor['specialization']}\n"
-        message += f"**Date:** {date_str}\n"
-        message += f"**Time:** {slot.get('startTime', '')} - {slot.get('endTime', '')}\n"
-        message += f"**Hospital:** {doctor['hospital']}\n"
-        message += f"**Consultation Fee:** ${doctor['consultationFee']}\n"
-        message += f"**Appointment ID:** {appointment_id}\n\n"
-        message += "📧 **A confirmation email has been sent to your registered email address.**\n\n"
-        message += "**Important Notes:**\n"
-        message += "• Please arrive 15 minutes early\n"
-        message += "• Bring a valid ID and any previous medical records\n"
-        message += "• If you need to cancel or reschedule, please do so at least 24 hours in advance\n\n"
-        message += "Thank you for choosing MediGo! Take care! 🏥"
+        message = "Appointment Confirmed!\n\n"
+        message += f"Doctor: Dr. {doctor['name']}\n"
+        message += f"Specialization: {doctor['specialization']}\n"
+        message += f"Date: {date_str}\n"
+        message += f"Time: {slot.get('startTime', '')} - {slot.get('endTime', '')}\n"
+        message += f"Hospital: {doctor['hospital']}\n"
+        message += f"Consultation Fee: Rs.{doctor['consultationFee']}\n"
+        message += f"Appointment ID: {appointment_id}\n\n"
+        message += "A confirmation email has been sent to your registered email address.\n\n"
+        message += "Important Notes:\n"
+        message += "- Please arrive 15 minutes early\n"
+        message += "- Bring a valid ID and any previous medical records\n"
+        message += "- If you need to cancel or reschedule, please do so at least 24 hours in advance\n\n"
+        message += "Thank you for choosing MediGo! Take care!"
         
         return message
     
