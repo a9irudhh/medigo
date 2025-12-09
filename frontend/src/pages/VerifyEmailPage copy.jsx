@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';;
 import Spinner from '../components/Spinner';
 import { verifyEmail } from '../services/api';
@@ -10,11 +10,13 @@ import useAuthStore from '../store/authStore';
 
 const VerifyEmailPage = ( {setReload} ) => {
   const navigate = useNavigate();
-  const [otp, setOtp] = useState('');
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const { user, setUser } = useAuthStore();
+
+  const inputRefs = useRef([]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,8 +24,17 @@ const VerifyEmailPage = ( {setReload} ) => {
     setError('');
     setMessage('');
     console.log('Submitting token:', otp);
+    const finalOtp = otp.join("");
+
+    if (finalOtp.length !== 6) {
+      alert("Please enter all 6 digits of the OTP.");
+      return;
+    }
+
+    console.log("OTP:", finalOtp);
+
     try {
-      await verifyEmail(otp);
+      await verifyEmail(finalOtp);
       setMessage('Your email has been successfully verified!');
       
       
@@ -57,23 +68,46 @@ const VerifyEmailPage = ( {setReload} ) => {
     }
   };
 
+  const handleOtpChange = (value, index) => {
+    if (!/^\d*$/.test(value)) return;
+
+    const updated = [...otp];
+    updated[index] = value;
+    setOtp(updated);
+
+    if (value && index < 5) {
+      inputRefs.current[index + 1].focus();
+    }
+  };
+
+  const handleOtpBackspace = (e, index) => {
+    if (e.key === "Backspace" && otp[index] === "" && index > 0) {
+      inputRefs.current[index - 1].focus();
+    }
+  };
+
   return (
     <>
     <Header />
     <div className="flex flex-col items-center justify-center min-h-[90vh] bg-gradient-to-b from-teal-50 to-white">
-      <div className="flex flex-grow flex-col max-w-md justify-center p-8 space-y-6">
+      <div className="flex flex-grow flex-col max-w-lg justify-center p-8 space-y-6">
         <h2 className="text-2xl font-bold text-center">Verify Your Email</h2>
         <p className="text-center text-gray-600">Enter the 6-digit code sent to your email address.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            name="otp"
+          <div className="flex justify-center gap-3 mt-6">
+          {otp.map((digit, i) => (
+            <input
+            key={i}
+            ref={(el) => (inputRefs.current[i] = el)}
             type="text"
-            placeholder="Verification Code"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
-            className="text-center w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
-            required
+            maxLength={1}
+            value={digit}
+            onChange={(e) => handleOtpChange(e.target.value, i)}
+            onKeyDown={(e) => handleOtpBackspace(e, i)}
+              className="w-12 h-12 text-center border border-gray-300 rounded-md text-xl font-medium focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
+          ))}
+        </div>
           {message && <p className="text-green-600">{message}</p>}
           {error && <p className="text-red-600">{error}</p>}
 

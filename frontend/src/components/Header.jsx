@@ -34,7 +34,7 @@ const Header = () => {
                 <div className="flex-shrink-0">
                     <h1 className="text-xl font-bold text-gray-800 flex items-center">
                         <BotIcon className="w-6 h-6 mr-2 text-teal-600" />
-                        Medigo Assistant
+                        MediGo Assistant
                     </h1>
                 </div>
                 </Link>

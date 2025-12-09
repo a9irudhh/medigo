@@ -168,7 +168,7 @@ class EnhancedMedicalConsultationWorkflow:
                 f"- Experience: {top_doctor['experience']} years\n"
                 f"- Rating: {top_doctor['rating']}/5\n"
                 f"- Hospital: {top_doctor['hospital']}\n"
-                f"- Consultation Fee: ${top_doctor['consultationFee']}\n\n"
+                f"- Consultation Fee: ₹{top_doctor['consultationFee']}\n\n"
                 f"Would you like to book an appointment with Dr. {top_doctor['name']}?\n"
                 f"Reply 'yes' to proceed or 'no' to cancel."
             )
@@ -317,7 +317,7 @@ class EnhancedMedicalConsultationWorkflow:
                             f"Date: {date_str}\n"
                             f"Time: {selected_slot.get('startTime', '')} - {selected_slot.get('endTime', '')}\n"
                             f"Hospital: {recommended_doctor.get('hospital', 'N/A')}\n"
-                            f"Consultation Fee: ${recommended_doctor.get('consultationFee', 0)}\n"
+                            f"Consultation Fee: ₹{recommended_doctor.get('consultationFee', 0)}\n"
                             f"Appointment ID: {confirmation_result.get('appointmentId', 'N/A')}\n\n"
                             f"A confirmation email has been sent to your registered email address.\n\n"
                             f"Important:\n"

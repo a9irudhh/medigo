@@ -100,6 +100,8 @@ const ChatPage = () => {
       {/* Chat Messages */}
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="max-w-[80%] mx-auto space-y-8">
+
+      
           {messages.map((msg, idx) => (
             <div
               key={idx}
@@ -162,7 +164,7 @@ const ChatPage = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Send a message..."
+            placeholder={messages.length==0 ? "Start the Conversation by sending 'Hi'" : "Send a message..." }
             className="w-full pl-4 pr-12 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none transition-shadow duration-200 shadow-sm"
             rows="1"
             disabled={loading}
