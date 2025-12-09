@@ -10,6 +10,11 @@ import { sendAppointmentConfirmationEmail } from '../services/emailService.js';
 
 // Chat with AI Agent
 const chatWithAgent = asyncHandler(async (req, res) => {
+    // Handle case where body might be undefined
+    if (!req.body) {
+        throw new ApiError(400, 'Request body is required');
+    }
+    
     const { message, conversationId } = req.body;
     const userId = req.user._id;
     
